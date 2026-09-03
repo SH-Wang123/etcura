@@ -22,7 +22,7 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 const testPrefix = "/etcd-eye-test/"

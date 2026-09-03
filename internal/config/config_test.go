@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // fakeKeyring records calls so tests never touch the real Keychain.

@@ -364,7 +364,7 @@ const zhCN: Dict = {
 
 const dictionaries: Record<Locale, Dict> = { en, 'zh-CN': zhCN };
 
-const LOCALE_KEY = 'etcd-eye.locale';
+const LOCALE_KEY = 'etcura.locale';
 
 function detectLocale(): Locale {
   try {

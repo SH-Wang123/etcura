@@ -15,8 +15,8 @@ import (
 	"runtime"
 	"time"
 
-	"etcd-eye/internal/etcd"
-	"etcd-eye/internal/model"
+	"etcura/internal/etcd"
+	"etcura/internal/model"
 )
 
 func main() {

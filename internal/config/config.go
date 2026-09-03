@@ -1,5 +1,5 @@
 // Package config persists connection profiles under
-// ~/Library/Application Support/etcd-eye/ and keeps passwords out of that
+// ~/Library/Application Support/etcura/ and keeps passwords out of that
 // file by storing them in the macOS Keychain via go-keyring.
 package config
 
@@ -12,14 +12,14 @@ import (
 
 	"github.com/zalando/go-keyring"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 const (
-	appDirName   = "etcd-eye"
+	appDirName   = "etcura"
 	fileName     = "connections.json"
-	keyringUser  = "etcd-eye"
-	keyringService = "etcd-eye"
+	keyringUser  = "etcura"
+	keyringService = "etcura"
 )
 
 // keyringBackend abstracts the Keychain so tests can inject a fake.

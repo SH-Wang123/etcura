@@ -10,7 +10,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // NewClient dials a real clientv3 client from a normalized connection config.

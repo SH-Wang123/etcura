@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"etcd-eye/internal/config"
-	"etcd-eye/internal/etcd"
-	"etcd-eye/internal/model"
-	"etcd-eye/internal/protodec"
+	"etcura/internal/config"
+	"etcura/internal/etcd"
+	"etcura/internal/model"
+	"etcura/internal/protodec"
 )
 
 // App is the Wails binding surface. It contains no etcd logic of its own: it

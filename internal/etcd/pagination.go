@@ -3,7 +3,7 @@ package etcd
 import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 const (

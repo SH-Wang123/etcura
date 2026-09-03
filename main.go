@@ -16,7 +16,7 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:            "Etcd Eye",
+		Title:            "Etcura",
 		Width:            1360,
 		Height:           860,
 		MinWidth:         980,
@@ -31,8 +31,8 @@ func main() {
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarDefault(),
 			About: &mac.AboutInfo{
-				Title:   "Etcd Eye",
-				Message: "A lightweight native macOS etcd browser.\nGo + Wails v2 + Svelte.",
+				Title:   "Etcura",
+				Message: "A lightweight etcd desktop client.\nGo + Wails v2 + Svelte.",
 			},
 		},
 	})

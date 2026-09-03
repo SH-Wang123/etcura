@@ -7,7 +7,7 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // segmentScanBatch is how many keys-only KVs one RPC fetches while deriving

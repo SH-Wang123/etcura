@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 export PATH="$PATH:$HOME/go/bin"
 
 LOG=/tmp/wails-dev-repair.log
-rm -rf build/bin/etcd-eye.app
+rm -rf build/bin/etcura.app
 xattr -cr build/bin 2>/dev/null || true
 
 wails dev > "$LOG" 2>&1 &
@@ -24,19 +24,19 @@ WAILS_PID=$!
 trap "kill $WAILS_PID 2>/dev/null" EXIT
 
 repair_bundle() {
-  local app="build/bin/etcd-eye.app"
+  local app="build/bin/etcura.app"
   [ -d "$app" ] || return 0
   xattr -cr "$app" 2>/dev/null || true
   if codesign --force --deep --sign - "$app" >/dev/null 2>&1; then
     return 0
   fi
-  rm -rf /tmp/etcd-eye-dev-sign.app
-  cp -R "$app" /tmp/etcd-eye-dev-sign.app
-  xattr -cr /tmp/etcd-eye-dev-sign.app
-  codesign --force --deep --sign - /tmp/etcd-eye-dev-sign.app || return 1
+  rm -rf /tmp/etcura-dev-sign.app
+  cp -R "$app" /tmp/etcura-dev-sign.app
+  xattr -cr /tmp/etcura-dev-sign.app
+  codesign --force --deep --sign - /tmp/etcura-dev-sign.app || return 1
   rm -rf "$app"
-  cp -R /tmp/etcd-eye-dev-sign.app "$app"
-  rm -rf /tmp/etcd-eye-dev-sign.app
+  cp -R /tmp/etcura-dev-sign.app "$app"
+  rm -rf /tmp/etcura-dev-sign.app
   return 0
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 func TestDetailFromKVUTF8(t *testing.T) {

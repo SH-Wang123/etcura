@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // MapError converts any error surfaced by the etcd client, gRPC, TLS or this

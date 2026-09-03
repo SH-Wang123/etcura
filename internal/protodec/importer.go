@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 const (
@@ -82,7 +82,7 @@ func (im *Importer) Import(ctx context.Context, paths []string) ([]model.ProtoFi
 
 	// Flat staging dir: predictable import resolution for cross-file imports,
 	// immune to where the files live on disk.
-	tmp, err := os.MkdirTemp("", "etcd-eye-protos-*")
+	tmp, err := os.MkdirTemp("", "etcura-protos-*")
 	if err != nil {
 		return nil, model.NewError(model.CodeProtoError, "cannot create staging directory").WithDetail(err.Error())
 	}

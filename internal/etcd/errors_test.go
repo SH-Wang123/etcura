@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 func TestMapErrorContext(t *testing.T) {

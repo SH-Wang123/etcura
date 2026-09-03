@@ -10,7 +10,7 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // ListPage fetches one server-side page of keys under prefix, starting at the

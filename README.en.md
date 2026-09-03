@@ -1,6 +1,6 @@
 <div align="center">
 
-# Etcd Eye
+# Etcura
 
 **A lightweight, cross-platform etcd desktop client — macOS · Windows · Linux**
 
@@ -12,7 +12,8 @@ Go · Wails v2 · Svelte · TypeScript · one codebase, native desktop apps on e
 
 ---
 
-Etcd Eye is a stable, lightweight, fast-launching **cross-platform** GUI for etcd
+**Etcura** (a blend of **et**cd and **cura**te, as in carefully looking after your data) is a
+stable, lightweight, fast-launching **cross-platform** GUI for etcd
 (macOS / Windows / Linux) built for daily use: connection management, tree browsing,
 viewing / creating / editing (CAS-protected) / deleting keys, and automatic Protobuf value
 decoding. Go handles all etcd communication; the frontend only talks to Wails bindings. It is
@@ -21,7 +22,7 @@ server-side filtering everywhere and a memory footprint that does not grow with 
 never loads the whole database.
 
 <div align="center">
-  <img src="docs/screenshot.png" alt="Etcd Eye screenshot" width="960" />
+  <img src="docs/screenshot.png" alt="Etcura screenshot" width="960" />
   <p><sub>Three panes: connection profiles · key tree · value inspector — shown here in English; switch to 简体中文 from the toolbar</sub></p>
 </div>
 
@@ -29,7 +30,7 @@ never loads the whole database.
 
 - **Cross-platform**: built on Wails v2 (Go + the native system WebView of each platform); the
   same codebase produces native desktop apps everywhere, distributed via
-  [Releases](https://github.com/SH-Wang123/etcd-eye/releases)
+  [Releases](https://github.com/SH-Wang123/etcura/releases)
 - **Connection management**: multiple profiles (name / multiple endpoints / username / TLS /
   timeouts); Test Connection performs a real `Status` RPC; passwords live in the macOS
   Keychain — the config file never stores plaintext secrets
@@ -67,7 +68,7 @@ No Electron / Node backend / Tauri / SQLite / full-database caching / bulk loadi
 ## Project layout
 
 ```
-etcd-eye/
+etcura/
 ├── main.go                  # Wails entry (window, lifecycle)
 ├── app.go                   # Wails binding layer (thin + request-cancellation policy)
 ├── internal/
@@ -86,21 +87,21 @@ etcd-eye/
 │   ├── src/stores/          # connection state / tree signals / proto imports
 │   └── wailsjs/             # Wails-generated bindings
 ├── docs/                    # docs assets (README screenshot)
-└── build/bin/               # build output (etcd-eye.app / zip, not committed)
+└── build/bin/               # build output (etcura.app / zip, not committed)
 ```
 
 ## Getting started
 
 ### Download & install (Releases, recommended for most users)
 
-Etcd Eye follows a "one codebase, per-platform packages" model and is distributed via
-[Releases](https://github.com/SH-Wang123/etcd-eye/releases/latest). macOS packages are
+Etcura follows a "one codebase, per-platform packages" model and is distributed via
+[Releases](https://github.com/SH-Wang123/etcura/releases/latest). macOS packages are
 available today — **Apple Silicon (arm64)** / **Intel (amd64)** / **Universal**; Windows and
-Linux packages will follow in upcoming releases. Unzip and drag `etcd-eye.app` into
+Linux packages will follow in upcoming releases. Unzip and drag `etcura.app` into
 /Applications — no installer needed.
 
 > Builds are currently ad-hoc signed and not notarized, so Gatekeeper may warn on first
-> launch. Either right-click the app → Open, or run `xattr -cr /Applications/etcd-eye.app`
+> launch. Either right-click the app → Open, or run `xattr -cr /Applications/etcura.app`
 > in a terminal before opening.
 
 ## Local development & debugging
@@ -167,7 +168,7 @@ Go heap steady at ~1.1 MB — no growth with browsing volume.
 ./scripts/build.sh universal    # universal binary
 ```
 
-Output: `build/bin/etcd-eye.app` (ad-hoc signed, runs directly) plus a zip archive.
+Output: `build/bin/etcura.app` (ad-hoc signed, runs directly) plus a zip archive.
 
 ## Running tests
 
@@ -180,8 +181,8 @@ npm --prefix frontend run build                             # frontend build
 
 ## Configuration storage
 
-- Connection profiles: `~/Library/Application Support/etcd-eye/connections.json` (0600, no passwords)
-- Passwords: macOS Keychain (service `etcd-eye`)
+- Connection profiles: `~/Library/Application Support/etcura/connections.json` (0600, no passwords)
+- Passwords: macOS Keychain (service `etcura`)
 - UI language: `localStorage` (defaults to the system language)
 
 ## Design notes (why it is fast and memory-friendly)

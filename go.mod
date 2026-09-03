@@ -1,4 +1,4 @@
-module etcd-eye
+module etcura
 
 go 1.25.0
 

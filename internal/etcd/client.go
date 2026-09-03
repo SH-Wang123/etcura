@@ -8,7 +8,7 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"etcd-eye/internal/model"
+	"etcura/internal/model"
 )
 
 // Manager owns the single long-lived clientv3.Client for the app. Exactly one

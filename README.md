@@ -1,6 +1,6 @@
 <div align="center">
 
-# Etcd Eye
+# Etcura
 
 **轻量级跨平台 etcd 桌面管理工具 —— macOS · Windows · Linux**
 
@@ -12,21 +12,21 @@ Go · Wails v2 · Svelte · TypeScript · 一套代码，各平台原生桌面�
 
 ---
 
-Etcd Eye 是一个"稳定、轻量、启动快、可长期日常使用"的跨平台 etcd 图形客户端
+**Etcura**（**et**cd + **cura**te，精心打理）是一个"稳定、轻量、启动快、可长期日常使用"的跨平台 etcd 图形客户端
 （macOS / Windows / Linux）：连接管理、目录树浏览、查看/新建/编辑（CAS 防覆盖）/删除 key、
 Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails 绑定调用；专为大规模集群设计，
 **最高可流畅支撑百万级 key** —— 全程游标分页 + 服务端过滤，内存占用不随 key 总量增长，
 绝不一次性加载数据库。
 
 <div align="center">
-  <img src="docs/screenshot.png" alt="Etcd Eye 界面截图" width="960" />
+  <img src="docs/screenshot.png" alt="Etcura 界面截图" width="960" />
   <p><sub>三栏布局：连接管理 · 目录树浏览 · 值查看/编辑 —— 截图为英文界面，可在工具栏一键切换为简体中文</sub></p>
 </div>
 
 ## 功能特性
 
 - **跨平台**：基于 Wails v2（Go + 各平台系统 WebView），同一代码库构建各平台原生桌面应用，
-  安装包统一通过 [Releases](https://github.com/SH-Wang123/etcd-eye/releases) 分发
+  安装包统一通过 [Releases](https://github.com/SH-Wang123/etcura/releases) 分发
 - **连接管理**：多配置（名称 / 多 Endpoints / 用户名 / TLS / 超时），测试连接走真实
   `Status` RPC；密码存 macOS 钥匙串，配置文件永不落盘明文
 - **目录树浏览**：单列缩进目录树，目录懒展开、叶子 key 点击即查看；服务端游标分页
@@ -57,7 +57,7 @@ Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails �
 ## 目录结构
 
 ```
-etcd-eye/
+etcura/
 ├── main.go                  # Wails 入口（窗口、生命周期）
 ├── app.go                   # Wails 绑定层（薄封装 + 请求取消策略）
 ├── internal/
@@ -76,20 +76,20 @@ etcd-eye/
 │   ├── src/stores/          # 连接状态 / 树信号 / proto 导入
 │   └── wailsjs/             # Wails 自动生成的绑定
 ├── docs/                    # 文档资源（README 截图）
-└── build/bin/               # 构建产物（etcd-eye.app / zip，不入库）
+└── build/bin/               # 构建产物（etcura.app / zip，不入库）
 ```
 
 ## 快速开始
 
 ### 下载安装（Releases，推荐大多数用户）
 
-Etcd Eye 以"一套代码、多平台安装包"的方式通过
-[Releases](https://github.com/SH-Wang123/etcd-eye/releases/latest) 分发。当前已提供 macOS 包：
+Etcura 以"一套代码、多平台安装包"的方式通过
+[Releases](https://github.com/SH-Wang123/etcura/releases/latest) 分发。当前已提供 macOS 包：
 **Apple Silicon (arm64)** / **Intel (amd64)** / **Universal**，Windows 与 Linux 安装包将在
-后续版本加入。解压得到 `etcd-eye.app`，拖入「应用程序」即可使用。
+后续版本加入。解压得到 `etcura.app`，拖入「应用程序」即可使用。
 
 > 构建目前为 ad-hoc 签名、尚未公证，首次打开如遇 Gatekeeper 提示，任选其一：
-> 右键点击 App → 「打开」；或在终端执行 `xattr -cr /Applications/etcd-eye.app` 后再打开。
+> 右键点击 App → 「打开」；或在终端执行 `xattr -cr /Applications/etcura.app` 后再打开。
 
 ## 本地开发与调试
 
@@ -153,7 +153,7 @@ go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rou
 ./scripts/build.sh universal    # 通用二进制
 ```
 
-产物：`build/bin/etcd-eye.app`（ad-hoc 签名，可直接运行）与同名 zip。
+产物：`build/bin/etcura.app`（ad-hoc 签名，可直接运行）与同名 zip。
 
 ## 运行测试
 
@@ -166,8 +166,8 @@ npm --prefix frontend run build                             # 前端构建
 
 ## 配置存储
 
-- 连接配置：`~/Library/Application Support/etcd-eye/connections.json`（0600，不含密码）
-- 密码：macOS 钥匙串（service `etcd-eye`）
+- 连接配置：`~/Library/Application Support/etcura/connections.json`（0600，不含密码）
+- 密码：macOS 钥匙串（service `etcura`）
 - 界面语言：`localStorage`（默认跟随系统语言）
 
 ## 设计要点（为什么它快且省内存）

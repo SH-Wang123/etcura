@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 ARCH="${1:-arm64}"
 export PATH="$PATH:$HOME/go/bin"
 
-APP="build/bin/etcd-eye.app"
+APP="build/bin/etcura.app"
 
 echo "==> wails build -platform darwin/${ARCH}"
 wails build -platform "darwin/${ARCH}" || echo "    wails reported a signing error; re-signing here"
@@ -32,18 +32,18 @@ xattr -cr "$APP" || true
 echo "==> ad-hoc signing"
 if ! codesign --force --deep --sign - "$APP" 2>/dev/null; then
   echo "    direct signing failed (file provider tagging); signing via /tmp"
-  rm -rf /tmp/etcd-eye-sign.app
-  cp -R "$APP" /tmp/etcd-eye-sign.app
-  xattr -cr /tmp/etcd-eye-sign.app
-  codesign --force --deep --sign - /tmp/etcd-eye-sign.app
+  rm -rf /tmp/etcura-sign.app
+  cp -R "$APP" /tmp/etcura-sign.app
+  xattr -cr /tmp/etcura-sign.app
+  codesign --force --deep --sign - /tmp/etcura-sign.app
   # Verify while the bundle is still outside the iCloud-synced tree: file
   # provider re-tags files inside ~/Documents after copy-back, which makes a
   # later strict verify report "detritus" even though the app runs fine.
-  codesign --verify --deep --strict /tmp/etcd-eye-sign.app
+  codesign --verify --deep --strict /tmp/etcura-sign.app
   rm -rf "$APP"
-  cp -R /tmp/etcd-eye-sign.app "$APP"
-  rm -rf /tmp/etcd-eye-sign.app
+  cp -R /tmp/etcura-sign.app "$APP"
+  rm -rf /tmp/etcura-sign.app
 fi
 
-echo "==> OK: $APP ($(file -b "$APP/Contents/MacOS/etcd-eye" | cut -d, -f1-2))"
+echo "==> OK: $APP ($(file -b "$APP/Contents/MacOS/etcura" | cut -d, -f1-2))"
 echo "    it: xattr -cr ${APP} && codesign --force --deep --sign - ${APP}"

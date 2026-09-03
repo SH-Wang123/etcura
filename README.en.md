@@ -32,8 +32,9 @@ never loads the whole database.
   same codebase produces native desktop apps everywhere, distributed via
   [Releases](https://github.com/SH-Wang123/etcura/releases)
 - **Connection management**: multiple profiles (name / multiple endpoints / username / TLS /
-  timeouts); Test Connection performs a real `Status` RPC; passwords live in the macOS
-  Keychain — the config file never stores plaintext secrets
+  timeouts); Test Connection performs a real `Status` RPC; passwords live in the OS keyring
+  (macOS Keychain / Windows Credential Manager / Linux Secret Service) — the config file never
+  stores plaintext secrets
 - **Tree browsing**: single indented tree, lazily expanded directories, click a leaf key to
   inspect it; server-side cursor pagination (200 rows per level by default, hard-capped at
   1000 by the backend), in-tree `More…` incremental loading; virtual scrolling keeps the DOM
@@ -95,12 +96,11 @@ etcura/
 ### Download & install (Releases, recommended for most users)
 
 Etcura follows a "one codebase, per-platform packages" model and is distributed via
-[Releases](https://github.com/SH-Wang123/etcura/releases/latest). macOS packages are
-available today — **Apple Silicon (arm64)** / **Intel (amd64)** / **Universal**; Windows and
-Linux packages will follow in upcoming releases. Unzip and drag `etcura.app` into
-/Applications — no installer needed.
+[Releases](https://github.com/SH-Wang123/etcura/releases/latest). Every platform ships
+**amd64 (x64)** and **arm64** builds: macOS (`etcura.app`, plus a Universal archive),
+Windows (`etcura.exe`) and Linux (single binary).
 
-> Builds are currently ad-hoc signed and not notarized, so Gatekeeper may warn on first
+> macOS builds are currently ad-hoc signed and not notarized, so Gatekeeper may warn on first
 > launch. Either right-click the app → Open, or run `xattr -cr /Applications/etcura.app`
 > in a terminal before opening.
 
@@ -182,7 +182,7 @@ npm --prefix frontend run build                             # frontend build
 ## Configuration storage
 
 - Connection profiles: `~/Library/Application Support/etcura/connections.json` (0600, no passwords)
-- Passwords: macOS Keychain (service `etcura`)
+- Passwords: OS keyring (service `etcura`)
 - UI language: `localStorage` (defaults to the system language)
 
 ## Design notes (why it is fast and memory-friendly)
@@ -200,4 +200,4 @@ npm --prefix frontend run build                             # frontend build
 ## Roadmap (Phase 2 candidates)
 
 Watch live refresh · Lease management · key history & diff · tabs · Import/Export ·
-directory-first sorting option · signed & notarized builds · Windows / Linux builds
+directory-first sorting option · signed & notarized builds

@@ -28,7 +28,8 @@ Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails �
 - **跨平台**：基于 Wails v2（Go + 各平台系统 WebView），同一代码库构建各平台原生桌面应用，
   安装包统一通过 [Releases](https://github.com/SH-Wang123/etcura/releases) 分发
 - **连接管理**：多配置（名称 / 多 Endpoints / 用户名 / TLS / 超时），测试连接走真实
-  `Status` RPC；密码存 macOS 钥匙串，配置文件永不落盘明文
+  `Status` RPC；密码存系统钥匙串（macOS Keychain / Windows 凭据管理器 / Linux Secret
+  Service），配置文件永不落盘明文
 - **目录树浏览**：单列缩进目录树，目录懒展开、叶子 key 点击即查看；服务端游标分页
   （每层 200 行起、上限 1000 由后端钳制），单层超一页时树内 `More…` 增量加载；
   虚拟滚动保持 DOM 恒定，只拉 keys-only 元数据，**绝不加载 Value、绝不全库扫描**
@@ -84,11 +85,11 @@ etcura/
 ### 下载安装（Releases，推荐大多数用户）
 
 Etcura 以"一套代码、多平台安装包"的方式通过
-[Releases](https://github.com/SH-Wang123/etcura/releases/latest) 分发。当前已提供 macOS 包：
-**Apple Silicon (arm64)** / **Intel (amd64)** / **Universal**，Windows 与 Linux 安装包将在
-后续版本加入。解压得到 `etcura.app`，拖入「应用程序」即可使用。
+[Releases](https://github.com/SH-Wang123/etcura/releases/latest) 分发，每个平台均提供
+**amd64 (x64)** 与 **arm64** 构建：macOS（`etcura.app`，另有 Universal 包）、Windows
+（`etcura.exe`）、Linux（单文件二进制）。
 
-> 构建目前为 ad-hoc 签名、尚未公证，首次打开如遇 Gatekeeper 提示，任选其一：
+> macOS 包目前为 ad-hoc 签名、尚未公证，首次打开如遇 Gatekeeper 提示，任选其一：
 > 右键点击 App → 「打开」；或在终端执行 `xattr -cr /Applications/etcura.app` 后再打开。
 
 ## 本地开发与调试
@@ -167,7 +168,7 @@ npm --prefix frontend run build                             # 前端构建
 ## 配置存储
 
 - 连接配置：`~/Library/Application Support/etcura/connections.json`（0600，不含密码）
-- 密码：macOS 钥匙串（service `etcura`）
+- 密码：系统钥匙串（service `etcura`）
 - 界面语言：`localStorage`（默认跟随系统语言）
 
 ## 设计要点（为什么它快且省内存）
@@ -184,4 +185,4 @@ npm --prefix frontend run build                             # 前端构建
 ## 路线图（Phase 2 候选）
 
 Watch 实时刷新 · Lease 管理 · key 历史与 diff · 多标签页 · Import/Export ·
-目录置顶排序选项 · 正式签名与公证 · Windows / Linux 版本
+目录置顶排序选项 · 正式签名与公证

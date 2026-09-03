@@ -1,6 +1,7 @@
-// Package config persists connection profiles under
-// ~/Library/Application Support/etcura/ and keeps passwords out of that
-// file by storing them in the macOS Keychain via go-keyring.
+// Package config persists connection profiles under the per-user config
+// directory (~/Library/Application Support/etcura on macOS) and keeps
+// passwords out of that file by storing them in the OS keyring via
+// go-keyring (macOS Keychain, Windows Credential Manager, Secret Service).
 package config
 
 import (
@@ -110,7 +111,7 @@ func SetPassword(connectionID, password string) error {
 		return model.NewInvalidArgument("connection id must not be empty")
 	}
 	if err := keyringBackend.Set(connectionID, password); err != nil {
-		return model.NewError(model.CodeConfigError, "could not store password in the macOS Keychain").
+		return model.NewError(model.CodeConfigError, "could not store password in the system keyring").
 			WithDetail(err.Error())
 	}
 	return nil

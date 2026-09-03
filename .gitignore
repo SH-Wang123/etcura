@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# build output
+build/bin/
+frontend/dist/
+
+# dependencies
+node_modules/
+
+# wails-generated caches
+frontend/package.json.md5
+
+# internal working notes (contains private infrastructure details, keep local only)
+PHASE1_DELIVERY.md

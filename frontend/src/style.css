@@ -1,0 +1,211 @@
+/* Etcd Eye — global styles. Compact, macOS desktop-tool density.
+   Colors follow the system appearance via prefers-color-scheme. */
+
+:root {
+  color-scheme: light dark;
+
+  --sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
+
+  --bg: #f2f2f4;
+  --panel: #ffffff;
+  --panel-alt: #f7f7f9;
+  --border: #d8d8dd;
+  --row-border: #ececef;
+  --text: #1d1d1f;
+  --dim: #71717a;
+
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --danger: #d63a2f;
+  --danger-bg: rgba(214, 58, 47, 0.08);
+  --ok: #2f9e44;
+  --ok-bg: rgba(47, 158, 68, 0.08);
+  --warning: #c78a04;
+  --warning-bg: rgba(199, 138, 4, 0.1);
+  --warning-text: #8a6403;
+
+  --hover: #ececf0;
+  --selected: #dbe6f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e20;
+    --panel: #252528;
+    --panel-alt: #2b2b2f;
+    --border: #3a3a40;
+    --row-border: #303035;
+    --text: #e6e6e9;
+    --dim: #98989f;
+
+    --accent: #4c8dff;
+    --danger: #ff5c55;
+    --danger-bg: rgba(255, 92, 85, 0.12);
+    --ok: #46c05f;
+    --ok-bg: rgba(70, 192, 95, 0.12);
+    --warning: #e0a712;
+    --warning-bg: rgba(224, 167, 18, 0.14);
+    --warning-text: #e0a712;
+
+    --hover: #333339;
+    --selected: #2b3d5e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- inputs */
+
+input,
+textarea,
+select {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
+  outline: none;
+}
+
+input.mono,
+textarea.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+}
+
+textarea {
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.btn.danger.confirm-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn.btn-small {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.btn.btn-tiny {
+  font-size: 11px;
+  padding: 1px 7px;
+}
+
+.btn.active {
+  background: var(--selected);
+  border-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- dialogs */
+
+.dialog input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+/* ------------------------------------------------------------- scrollbars */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.65);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

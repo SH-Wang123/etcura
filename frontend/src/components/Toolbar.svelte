@@ -1,0 +1,186 @@
+<script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+  import {
+    connections,
+    activeId,
+    connectingId,
+    connect,
+    disconnect,
+    status,
+    isConnected,
+  } from '../stores/connections';
+  import { basePath, searchMode, exactLookup, refreshCurrent, setBasePath } from '../stores/keys';
+  import { t, locale, setLocale, locales } from '../lib/i18n';
+
+  export let searchEl: HTMLInputElement | null = null;
+
+  /** Number of imported proto message types (badge on the Protos button). */
+  export let protoCount = 0;
+
+  const dispatch = createEventDispatcher<{ newkey: void; protos: void }>();
+
+  let search = $basePath;
+  let baseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function onConnectionChange(e: Event): void {
+    const id = (e.currentTarget as HTMLSelectElement).value;
+    if (!id || $activeId === id) return;
+    void connect(id);
+  }
+
+  function onModeChange(e: Event): void {
+    searchMode.set((e.currentTarget as HTMLSelectElement).value as 'prefix' | 'exact');
+  }
+
+  // Debounced base-prefix input: after the user stops typing, the tree
+  // switches to the new scope (the backend cancels the previous request).
+  function onSearchInput(): void {
+    if ($searchMode !== 'prefix') return;
+    if (baseTimer) clearTimeout(baseTimer);
+    baseTimer = setTimeout(() => {
+      void setBasePath(search);
+    }, 300);
+  }
+
+  function onSearchKeydown(e: KeyboardEvent): void {
+    if (e.key !== 'Enter') return;
+    if (baseTimer) clearTimeout(baseTimer);
+    if ($searchMode === 'exact') void exactLookup(search);
+  }
+
+  function onRefresh(): void {
+    if (isConnected()) void refreshCurrent();
+  }
+
+  function onNewKey(): void {
+    if (isConnected()) dispatch('newkey');
+  }
+
+  function onLocaleChange(e: Event): void {
+    setLocale((e.currentTarget as HTMLSelectElement).value as typeof $locale);
+  }
+</script>
+
+<div class="toolbar">
+  <div class="conn">
+    <span class="dot {$status.state}" title={$status.message || $status.state} />
+    <select value={$activeId ?? ''} on:change={onConnectionChange} title={$t('tip.connection')}>
+      {#if !$activeId}
+        <option value="" disabled>{$t('toolbar.noConnection')}</option>
+      {/if}
+      {#each $connections as c (c.id)}
+        <option value={c.id}>
+          {c.name}{$connectingId === c.id ? $t('toolbar.connectingSuffix') : $activeId === c.id ? $t('toolbar.checkmark') : ''}
+        </option>
+      {/each}
+    </select>
+    {#if $activeId}
+      <button class="btn btn-small" on:click={disconnect} title={$t('tip.disconnect')}>{$t('toolbar.disconnect')}</button>
+    {/if}
+  </div>
+
+  <div class="search">
+    <select class="mode" value={$searchMode} on:change={onModeChange} title={$t('tip.searchMode')}>
+      <option value="prefix">{$t('search.prefix')}</option>
+      <option value="exact">{$t('search.exact')}</option>
+    </select>
+    <input
+      bind:this={searchEl}
+      bind:value={search}
+      on:input={onSearchInput}
+      on:keydown={onSearchKeydown}
+      placeholder={$searchMode === 'prefix' ? $t('placeholder.prefix') : $t('placeholder.exact')}
+      spellcheck="false"
+      autocomplete="off"
+    />
+  </div>
+
+  <div class="actions">
+    <button class="btn" on:click={() => dispatch('protos')} title={$t('tip.protos')}>
+      {$t('btn.protos')}{protoCount > 0 ? ` (${protoCount})` : ''}
+    </button>
+    <button class="btn" on:click={onNewKey} disabled={$status.state !== 'connected'} title={$t('tip.newKey')}>
+      {$t('btn.newKey')}
+    </button>
+    <button class="btn" on:click={onRefresh} title={$t('tip.refresh')}>{$t('btn.refresh')}</button>
+    <select
+      class="locale"
+      value={$locale}
+      on:change={onLocaleChange}
+      title={$t('locale.label')}
+      aria-label={$t('locale.label')}
+    >
+      {#each locales as l (l.id)}
+        <option value={l.id}>{l.label}</option>
+      {/each}
+    </select>
+  </div>
+</div>
+
+<style>
+  .toolbar {
+    grid-area: toolbar;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-alt);
+  }
+  .conn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    min-width: 0;
+  }
+  .conn select {
+    max-width: 180px;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--dim);
+  }
+  .dot.connected {
+    background: var(--ok);
+  }
+  .dot.connecting {
+    background: var(--warning);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .dot.error {
+    background: var(--danger);
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+  .search input {
+    flex: 1;
+  }
+  .mode {
+    flex: none;
+  }
+  .actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .locale {
+    font-size: 11px;
+    padding: 2px 4px;
+    height: 24px;
+  }
+</style>

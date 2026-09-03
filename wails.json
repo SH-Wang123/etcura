@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "etcd-eye",
+  "outputfilename": "etcd-eye",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "SH Wang",
+    "email": "52746618+SH-Wang123@users.noreply.github.com"
+  }
+}

@@ -22,9 +22,9 @@ const en = {
   'btn.protos': 'Protos',
   'tip.protos': 'Import .proto definitions for protobuf value decoding',
   'btn.newKey': 'New Key',
-  'tip.newKey': 'New Key (⌘N)',
+  'tip.newKey': 'New Key ({mod}N)',
   'btn.refresh': 'Refresh',
-  'tip.refresh': 'Refresh (⌘R)',
+  'tip.refresh': 'Refresh ({mod}R)',
   'tip.disconnect': 'Disconnect',
 
   // sidebar
@@ -51,6 +51,7 @@ const en = {
   'tree.more': 'More…',
   'tree.page': 'page',
   'tree.tipPageSize': 'Rows fetched per tree level',
+  'tree.tipRefresh': 'Refresh keys and the selected value ({mod}R)',
   'tree.empty': 'empty',
 
   // inspector
@@ -69,7 +70,7 @@ const en = {
   'tip.prettyJSON': 'Format as pretty JSON (content is saved as-is on Save)',
   'tip.reload': 'Reload from server',
   'tip.delete': 'Delete this key',
-  'tip.save': 'Save (⌘S) with ModRevision compare-and-swap',
+  'tip.save': 'Save ({mod}S) with ModRevision compare-and-swap',
   'btn.prettyJSON': 'Pretty JSON',
   'btn.reload': 'Reload',
   'btn.delete': 'Delete',
@@ -143,11 +144,14 @@ const en = {
 
   // proto dialog
   'proto.title': 'Protobuf definitions',
-  'proto.hint': 'Import .proto files to decode binary values that hold protobuf data. The app tries every imported message type on each value and ranks the best matches (you can switch between them in the value panel). Cross-file imports are resolved from the files\' directories.',
+  'proto.hint': 'Import .proto files (or a whole folder) to decode protobuf values. Each value is tried against every imported message type and the best matches are ranked — you can switch candidates in the value panel. Cross-file imports resolve like protoc, and google/protobuf/*.proto well-known types work without selecting them.',
   'proto.paths': 'Paths',
-  'proto.pathsHint': '(one .proto file per line)',
+  'proto.pathsHint': '(one .proto file or folder per line)',
   'proto.pathsPlaceholder': '/path/to/demo.proto\n/path/to/common.proto',
-  'proto.browse': 'Browse…',
+  'proto.browse': 'Files…',
+  'proto.browseDir': 'Folder…',
+  'proto.browseDirTitle': 'Select a folder containing .proto files',
+  'proto.errorTitle': 'Import failed',
   'proto.selectTitle': 'Select .proto files',
   'proto.imported': 'Imported ({n} files)',
   'proto.none': 'No proto files imported yet.',
@@ -169,7 +173,7 @@ const en = {
   'status.disconnected': 'disconnected',
   'status.connecting': 'connecting',
   'status.error': 'error',
-  'status.hint': '⌘R refresh · ⌘N new key · ⌘S save · ⌘F search',
+  'status.hint': '{mod}R refresh · {mod}N new key · {mod}S save · {mod}F search',
 
   // localized error messages (fallback: backend message)
   'error.CONNECTION_FAILED': 'Could not reach the etcd server',
@@ -205,9 +209,9 @@ const zhCN: Dict = {
   'btn.protos': 'Protos',
   'tip.protos': '导入 .proto 定义，用于解码 protobuf 二进制值',
   'btn.newKey': '新建 Key',
-  'tip.newKey': '新建 Key（⌘N）',
+  'tip.newKey': '新建 Key（{mod}N）',
   'btn.refresh': '刷新',
-  'tip.refresh': '刷新（⌘R）',
+  'tip.refresh': '刷新（{mod}R）',
   'tip.disconnect': '断开连接',
 
   'sidebar.title': '连接',
@@ -231,6 +235,7 @@ const zhCN: Dict = {
   'tree.more': '更多…',
   'tree.page': '每页',
   'tree.tipPageSize': '每层目录拉取的行数',
+  'tree.tipRefresh': '刷新 Keys 与当前选中值（{mod}R）',
   'tree.empty': '空',
 
   'inspector.empty': '选择一个 key 查看其内容。',
@@ -248,7 +253,7 @@ const zhCN: Dict = {
   'tip.prettyJSON': '格式化为 JSON（保存时仍以编辑器当前内容为准）',
   'tip.reload': '从服务器重新加载',
   'tip.delete': '删除此 key',
-  'tip.save': '保存（⌘S，带 ModRevision 比较防覆盖）',
+  'tip.save': '保存（{mod}S，带 ModRevision 比较防覆盖）',
   'btn.prettyJSON': '格式化 JSON',
   'btn.reload': '重新加载',
   'btn.delete': '删除',
@@ -319,11 +324,14 @@ const zhCN: Dict = {
   'newkey.overwroteToast': '已覆盖 {key}',
 
   'proto.title': 'Protobuf 定义',
-  'proto.hint': '导入 .proto 文件后，可解码 protobuf 二进制值：应用会对每个值尝试所有已导入的消息类型并按匹配度排序（可在值面板切换候选）。跨文件 import 会从所选文件的目录解析。',
+  'proto.hint': '导入 .proto 文件（可直接选择整个目录）后即可解码 protobuf 二进制值：应用会对每个值尝试所有已导入的消息类型并按匹配度排序（可在值面板切换候选）。跨文件 import 按 protoc 的规则解析，google/protobuf/*.proto 等 well-known types 无需手动选择。',
   'proto.paths': '文件路径',
-  'proto.pathsHint': '（每行一个 .proto 文件）',
+  'proto.pathsHint': '（每行一个 .proto 文件或目录）',
   'proto.pathsPlaceholder': '/path/to/demo.proto\n/path/to/common.proto',
-  'proto.browse': '浏览…',
+  'proto.browse': '选择文件…',
+  'proto.browseDir': '选择目录…',
+  'proto.browseDirTitle': '选择包含 .proto 文件的目录',
+  'proto.errorTitle': '导入失败',
   'proto.selectTitle': '选择 .proto 文件',
   'proto.imported': '已导入（{n} 个文件）',
   'proto.none': '尚未导入任何 proto 文件。',
@@ -343,7 +351,7 @@ const zhCN: Dict = {
   'status.disconnected': '未连接',
   'status.connecting': '连接中',
   'status.error': '错误',
-  'status.hint': '⌘R 刷新 · ⌘N 新建 · ⌘S 保存 · ⌘F 搜索',
+  'status.hint': '{mod}R 刷新 · {mod}N 新建 · {mod}S 保存 · {mod}F 搜索',
 
   'error.CONNECTION_FAILED': '无法连接到 etcd 服务器',
   'error.NOT_CONNECTED': '尚未连接到 etcd 服务器',
@@ -390,13 +398,20 @@ locale.subscribe((l) => {
 
 export type Params = Record<string, string | number>;
 
+/** Keyboard modifier symbol for the current platform: ⌘ on macOS, Ctrl+ elsewhere. */
+export const modSymbol: string =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent)
+    ? '⌘'
+    : 'Ctrl+';
+
 function translate(l: Locale, key: string, params?: Params): string {
   const dict = dictionaries[l] ?? dictionaries.en;
   let s: string = dict[key as keyof Dict] ?? (dictionaries.en[key as keyof Dict] ?? key);
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      s = s.replaceAll(`{${k}}`, String(v));
-    }
+  // {mod} is a platform constant, injected automatically so no call site has
+  // to pass it.
+  const merged: Params = { mod: modSymbol, ...(params ?? {}) };
+  for (const [k, v] of Object.entries(merged)) {
+    s = s.replaceAll(`{${k}}`, String(v));
   }
   return s;
 }

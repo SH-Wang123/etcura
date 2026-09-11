@@ -13,7 +13,7 @@
   import { importedProtos, loadProtos } from './stores/protos';
   import {
     selectedPrefix,
-    refreshCurrent,
+    refreshAll,
     requestSave,
     updateDetail,
     bumpTree,
@@ -75,7 +75,7 @@
 
   function onRefreshAll(): void {
     if ($status.state === 'connected') {
-      void refreshCurrent();
+      void refreshAll();
     }
     void refreshStatus();
   }

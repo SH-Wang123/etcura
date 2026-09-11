@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { importedProtos, importProtos, clearProtos } from '../stores/protos';
+  import { importedProtos, importProtos, clearProtos, protoImportError, clearProtoImportError } from '../stores/protos';
   import { createEventDispatcher } from 'svelte';
   import { t, tr } from '../lib/i18n';
 
@@ -9,24 +9,43 @@
   let importing = false;
   let hasNativeDialog = !!window.runtime?.Dialog?.Open;
 
-  async function browse(): Promise<void> {
+  function appendPaths(arr: string[]): void {
+    if (arr.length === 0) return;
+    pathsText = pathsText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .concat(arr)
+      .join('\n');
+  }
+
+  async function browseFiles(): Promise<void> {
     const rt = window.runtime;
     if (!rt?.Dialog?.Open) return;
     try {
       const selected = await rt.Dialog.Open({
-        Title: 'Select .proto files',
+        Title: tr('proto.selectTitle'),
         Filters: [{ DisplayName: 'Proto files', Pattern: '*.proto' }],
         MultipleAllowed: true,
       });
-      const arr = Array.isArray(selected) ? selected : selected ? [selected] : [];
-      if (arr.length > 0) {
-        pathsText = pathsText
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .concat(arr)
-          .join('\n');
-      }
+      appendPaths(Array.isArray(selected) ? selected : selected ? [selected] : []);
+    } catch {
+      /* dialog cancelled */
+    }
+  }
+
+  // Picking the project root imports every .proto below it, so relative
+  // imports resolve without hand-selecting each file.
+  async function browseFolder(): Promise<void> {
+    const rt = window.runtime;
+    if (!rt?.Dialog?.Open) return;
+    try {
+      const selected = await rt.Dialog.Open({
+        Title: tr('proto.browseDirTitle'),
+        CanChooseDirectories: true,
+        CanChooseFiles: false,
+      });
+      appendPaths(Array.isArray(selected) ? selected : selected ? [selected] : []);
     } catch {
       /* dialog cancelled */
     }
@@ -60,7 +79,10 @@
       <div class="row">
         <span>{$t('proto.paths')} <em>{$t('proto.pathsHint')}</em></span>
         {#if hasNativeDialog}
-          <button class="btn btn-tiny" on:click={() => void browse()}>{$t('proto.browse')}</button>
+          <span class="browse-group">
+            <button class="btn btn-tiny" on:click={() => void browseFiles()}>{$t('proto.browse')}</button>
+            <button class="btn btn-tiny" on:click={() => void browseFolder()}>{$t('proto.browseDir')}</button>
+          </span>
         {/if}
       </div>
       <textarea
@@ -70,6 +92,20 @@
         spellcheck="false"
         placeholder={$t('proto.pathsPlaceholder')}
       />
+
+      {#if $protoImportError}
+        <div class="import-error">
+          <div class="import-error-head">
+            <strong>{$t('proto.errorTitle')}</strong>
+            <span class="spacer" />
+            <button class="btn btn-tiny" on:click={clearProtoImportError}>✕</button>
+          </div>
+          <div class="import-error-msg">{$protoImportError.message}</div>
+          {#if $protoImportError.detail}
+            <pre class="import-error-detail">{$protoImportError.detail}</pre>
+          {/if}
+        </div>
+      {/if}
 
       <div class="imported">
         <div class="row">
@@ -156,6 +192,44 @@
   .paths {
     width: 100%;
     font-size: 11.5px;
+  }
+  .browse-group {
+    display: flex;
+    gap: 4px;
+  }
+  .import-error {
+    margin-top: 10px;
+    border: 1px solid var(--danger);
+    background: var(--danger-bg);
+    border-radius: 4px;
+    padding: 8px 10px;
+  }
+  .import-error-head {
+    display: flex;
+    align-items: center;
+    font-size: 11.5px;
+    color: var(--danger);
+  }
+  .import-error-msg {
+    margin-top: 4px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    user-select: text;
+  }
+  .import-error-detail {
+    margin: 6px 0 0;
+    max-height: 180px;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--dim);
+    white-space: pre-wrap;
+    word-break: break-all;
+    user-select: text;
+  }
+  .import-error .spacer {
+    flex: 1;
   }
   .imported {
     margin-top: 12px;

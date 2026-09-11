@@ -9,10 +9,12 @@
     setPageSize,
     selectTreePrefix,
     selectKeyPath,
+    refreshAll,
   } from '../stores/keys';
   import { api, localizeError } from '../lib/api';
   import { toast } from '../lib/toast';
   import { t } from '../lib/i18n';
+  import { detailLoading } from '../stores/keys';
   import type { LevelRow } from '../lib/types';
 
   interface TreeChildren {
@@ -50,6 +52,10 @@
   let lastRev = 0;
   let lastReset = 0;
   let currentStatus = '';
+
+  // True while a refresh is in flight (tree levels or the selected value), so
+  // the header button can show progress and refuse double clicks.
+  $: busy = Object.keys(loadingSet).length > 0 || $detailLoading;
 
   // ---- flat windowing -----------------------------------------------------
   $: vStart = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
@@ -239,7 +245,17 @@
 <div class="tree">
   <div class="tree-header">
     <span class="title">{$t('tree.title')}</span>
-    {#if Object.keys(loadingSet).length > 0}
+    <button
+      class="refresh"
+      class:busy={busy}
+      disabled={$status.state !== 'connected' || busy}
+      title={$t('tree.tipRefresh')}
+      aria-label={$t('tree.tipRefresh')}
+      on:click={() => void refreshAll()}
+    >
+      <span class="glyph" class:spinning={busy}>⟳</span>
+    </button>
+    {#if busy}
       <span class="spinner" />
     {/if}
     <span class="spacer" />
@@ -419,6 +435,37 @@
     color: var(--dim);
     font-family: var(--mono);
     flex: none;
+  }
+  .refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 20px;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .refresh:hover:not(:disabled) {
+    background: var(--hover);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .refresh:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .refresh .glyph {
+    display: block;
+  }
+  .refresh .glyph.spinning {
+    animation: spin 0.8s linear infinite;
   }
   .spinner {
     width: 10px;

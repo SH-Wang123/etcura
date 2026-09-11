@@ -64,15 +64,24 @@ export function normalizeError(e: unknown): AppErrorShape {
   return { code: 'UNKNOWN', message: raw };
 }
 
-// localizeError additionally maps the error code to a translated message in
-// the active locale; unknown codes keep the backend's original message.
+// localizeError maps the error code to a translated headline in the active
+// locale. The backend's own message is preserved in `detail` whenever it was
+// more specific than the translation, so actionable guidance (e.g. which proto
+// import failed) is never lost.
 export function localizeError(e: unknown): AppErrorShape {
   const shape = normalizeError(e);
   const key = `error.${shape.code}`;
-  if (has(key)) {
-    return { ...shape, message: tr(key) };
+  if (!has(key)) {
+    return shape;
   }
-  return shape;
+  const localized = tr(key);
+  const backendSpecific = shape.message && shape.message !== localized;
+  const detail = backendSpecific
+    ? shape.detail
+      ? `${shape.message}\n\n${shape.detail}`
+      : shape.message
+    : shape.detail;
+  return { ...shape, message: localized, detail };
 }
 
 export const api = {

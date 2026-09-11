@@ -9,7 +9,7 @@
     status,
     isConnected,
   } from '../stores/connections';
-  import { basePath, searchMode, exactLookup, refreshCurrent, setBasePath } from '../stores/keys';
+  import { basePath, searchMode, exactLookup, refreshAll, setBasePath } from '../stores/keys';
   import { t, locale, setLocale, locales } from '../lib/i18n';
 
   export let searchEl: HTMLInputElement | null = null;
@@ -49,7 +49,7 @@
   }
 
   function onRefresh(): void {
-    if (isConnected()) void refreshCurrent();
+    if (isConnected()) void refreshAll();
   }
 
   function onNewKey(): void {

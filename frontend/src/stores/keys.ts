@@ -144,6 +144,16 @@ export async function refreshCurrent(): Promise<void> {
   bumpTree();
 }
 
+/**
+ * Full refresh of everything on screen: re-read the expanded tree levels and
+ * reload the currently selected key (metadata + value), so a manual refresh
+ * never leaves stale data in the inspector.
+ */
+export async function refreshAll(): Promise<void> {
+  bumpTree();
+  await reloadDetail();
+}
+
 /** Rebuild the tree from the root (connect, base change). */
 export async function loadFirst(): Promise<void> {
   clearSelection();

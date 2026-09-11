@@ -36,9 +36,11 @@ Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails �
 - **查询**：前缀模式（etcd prefix range，服务端执行）+ 精确 key 点查
 - **值查看/编辑**：UTF-8 / 二进制（十六进制、Base64 视图）；大值显示尺寸徽标；
   JSON 徽标 + 手动格式化
-- **Protobuf 解码**：导入 .proto 文件（支持跨文件 import，无需 protoc），二进制值
-  自动匹配所有已导入消息类型（wire 结构快速过滤 + 评分排序），Proto 视图只读展示
-  解码 JSON，候选可切换
+- **Protobuf 解码**：导入 .proto 文件或**整个目录**（递归收集，无需 protoc），
+  跨文件 import 按 protoc 规则解析，`google/protobuf/*.proto` 等 well-known types
+  无需手动选择；二进制值自动匹配所有已导入消息类型（wire 结构快速过滤 + 评分排序），
+  Proto 视图只读展示解码 JSON，候选可切换；导入失败时在对话框内给出可操作提示
+  （含 `文件:行号` 与 import 解析映射）
 - **安全写入**：新建前检查存在性（已存在需确认覆盖）；保存走 `Txn + Compare(ModRevision)`
   CAS，冲突时提示重载，绝不静默覆盖；删除仅限单 key 且强制确认（显示服务器与完整 key）
 - **国际化**：简体中文 / English 界面，跟随系统语言，可随时切换（含错误消息本地化）
@@ -69,7 +71,8 @@ etcura/
 ├── scripts/
 │   ├── seed/main.go         # benchmark 数据生成（10 万 key 一键写入）
 │   ├── bench/main.go        # 分页遍历 + Go 侧堆内存基准
-│   ├── build.sh             # 构建 + ad-hoc 签名（自动处理 codesign 竞速问题）
+│   ├── build.sh             # macOS 构建 + ad-hoc 签名（自动处理 codesign 竞速问题）
+│   ├── build-windows.sh     # Windows 交叉编译（mingw-w64，嵌入 WebView2 引导）
 │   └── dev.sh               # 可靠的 wails dev 启动（iCloud 目录热重载修复）
 ├── frontend/
 │   ├── src/lib/i18n.ts      # 双语词典与语言状态
@@ -146,7 +149,9 @@ go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rou
 10 万 key，连续 3 轮 × 100 页 × 200 行）：每轮 ~0.3s，Go 堆稳定在 ~1.1 MB，
 不随浏览量增长。
 
-## 构建 macOS App
+## 构建
+
+### macOS
 
 ```bash
 ./scripts/build.sh              # arm64（Apple Silicon，第一优先）
@@ -155,6 +160,20 @@ go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rou
 ```
 
 产物：`build/bin/etcura.app`（ad-hoc 签名，可直接运行）与同名 zip。
+
+### Windows
+
+```bash
+brew install mingw-w64          # 交叉编译工具链（仅 macOS/Linux 需要）
+./scripts/build-windows.sh      # 产出 build/bin/etcura.exe + zip
+```
+
+产物：`build/bin/etcura.exe`（单文件，已嵌入 WebView2 引导程序，目标机缺运行时可自动安装）
+与 `etcura-windows-amd64.zip`。
+
+> Windows 上首次运行若被 SmartScreen 拦截（未签名），点击「更多信息 → 仍要运行」；
+> 若提示缺少 WebView2 运行时，见 [docs/WINDOWS.md](docs/WINDOWS.md)（含完整排障步骤：
+> 常见原因是**误下载了 macOS 的 .app**）。
 
 ## 运行测试
 

@@ -6,6 +6,13 @@ build/bin/
 frontend/dist/
 /bin/
 
+# locally built binaries at the repo root — CI builds and attaches these to
+# releases, so they must never be committed (the file stays on disk)
+/etcura
+/etcura.exe
+/etcura-*.zip
+*.app/
+
 # dependencies
 node_modules/
 

@@ -43,10 +43,13 @@ never loads the whole database.
 - **Search**: prefix mode (etcd prefix range, executed server-side) + exact key lookup
 - **Value viewer/editor**: UTF-8 / binary (hex and Base64 views); large-value size badge;
   JSON badge with on-demand formatting
-- **Protobuf decoding**: import .proto files (cross-file imports supported, no protoc
-  needed); binary values are matched against every imported message type (wire-structure
-  prefilter + score ranking); read-only Proto view shows decoded JSON; candidates are
-  switchable
+- **Protobuf decoding**: import .proto files or a **whole folder** (collected
+  recursively, no protoc needed); cross-file imports resolve like protoc and
+  `google/protobuf/*.proto` well-known types work without selecting them; binary values
+  are matched against every imported message type (wire-structure prefilter + score
+  ranking); read-only Proto view shows decoded JSON; candidates are switchable; import
+  failures are reported inline with actionable detail (`file:line` plus the import
+  resolution mapping)
 - **Safe writes**: creating checks existence first (overwrite requires confirmation); saving
   uses `Txn + Compare(ModRevision)` CAS — on conflict you are asked to reload, never
   silently overwritten; deletes are single-key only and always confirmed (server + full key
@@ -80,7 +83,8 @@ etcura/
 ├── scripts/
 │   ├── seed/main.go         # benchmark data generator (100k keys in one run)
 │   ├── bench/main.go        # pagination walk + Go heap benchmark
-│   ├── build.sh             # build + ad-hoc signing (handles codesign races)
+│   ├── build.sh             # macOS build + ad-hoc signing (handles codesign races)
+│   ├── build-windows.sh     # Windows cross-build (mingw-w64, WebView2 embedded)
 │   └── dev.sh               # reliable wails dev (fixes hot-reload in iCloud-synced dirs)
 ├── frontend/
 │   ├── src/lib/i18n.ts      # bilingual dictionaries & locale state
@@ -160,7 +164,9 @@ The benchmark drives the exact pagination code path used by the app. Reference r
 (Apple Silicon, local etcd, 100k keys, 3 rounds × 100 pages × 200 rows): ~0.3s per round,
 Go heap steady at ~1.1 MB — no growth with browsing volume.
 
-## Build the macOS app
+## Build
+
+### macOS
 
 ```bash
 ./scripts/build.sh              # arm64 (Apple Silicon, primary target)
@@ -169,6 +175,22 @@ Go heap steady at ~1.1 MB — no growth with browsing volume.
 ```
 
 Output: `build/bin/etcura.app` (ad-hoc signed, runs directly) plus a zip archive.
+
+### Windows
+
+```bash
+brew install mingw-w64          # cross toolchain (macOS/Linux only)
+./scripts/build-windows.sh      # produces build/bin/etcura.exe + zip
+```
+
+Output: `build/bin/etcura.exe` — a single self-contained file with the WebView2
+bootstrapper embedded (it installs the runtime automatically if the target machine
+lacks it) — plus `etcura-windows-amd64.zip`.
+
+> On first launch Windows SmartScreen may block the unsigned binary: click
+> "More info → Run anyway". If it reports a missing WebView2 runtime, see
+> [docs/WINDOWS.md](docs/WINDOWS.md) — the most common cause of "nothing happens
+> on Windows 10" is downloading the **macOS .app** by mistake.
 
 ## Running tests
 

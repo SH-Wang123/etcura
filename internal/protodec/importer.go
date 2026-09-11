@@ -12,10 +12,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/bufbuild/protocompile"
@@ -71,58 +68,25 @@ func (im *Importer) MessageCount() int {
 	return len(im.messages)
 }
 
-// Import compiles the given proto files (absolute or relative paths) with
-// their directory as import path and replaces the current descriptor set.
-// Cross-file imports are resolved from the same directory set, so selecting
-// all files of a package (or its directory) just works.
+// Import compiles the given proto files and replaces the current descriptor
+// set. Relative layout is preserved (canonical paths derive from the files'
+// longest common directory), so cross-file imports such as
+// `import "api/v1/common.proto"` resolve exactly as with `protoc -I <root>`.
+// Well-known types (google/protobuf/*.proto) resolve even when not selected.
 func (im *Importer) Import(ctx context.Context, paths []string) ([]model.ProtoFileInfo, error) {
-	if len(paths) == 0 {
-		return nil, model.NewInvalidArgument("no proto files selected")
-	}
-
-	// Flat staging dir: predictable import resolution for cross-file imports,
-	// immune to where the files live on disk.
-	tmp, err := os.MkdirTemp("", "etcura-protos-*")
+	set, err := buildProtoSet(paths)
 	if err != nil {
-		return nil, model.NewError(model.CodeProtoError, "cannot create staging directory").WithDetail(err.Error())
-	}
-	defer os.RemoveAll(tmp)
-
-	entries := make([]string, 0, len(paths))
-	seen := map[string]bool{}
-	for _, p := range paths {
-		p = strings.TrimSpace(filepath.ToSlash(p))
-		if p == "" {
-			continue
-		}
-		base := filepath.Base(p)
-		if seen[base] {
-			return nil, model.NewError(model.CodeProtoError,
-				"duplicate file name %q across selected files; proto import paths must be unique", base)
-		}
-		seen[base] = true
-		data, rerr := os.ReadFile(p)
-		if rerr != nil {
-			return nil, model.NewError(model.CodeProtoError, "cannot read proto file: %s", p).
-				WithDetail(rerr.Error())
-		}
-		if werr := os.WriteFile(filepath.Join(tmp, base), data, 0o600); werr != nil {
-			return nil, model.NewError(model.CodeProtoError, "cannot stage proto file: %s", base).
-				WithDetail(werr.Error())
-		}
-		entries = append(entries, base)
-	}
-	if len(entries) == 0 {
-		return nil, model.NewInvalidArgument("no proto files selected")
+		return nil, err
 	}
 
 	compiler := protocompile.Compiler{
-		Resolver: &protocompile.SourceResolver{ImportPaths: []string{tmp}},
+		// WithStandardImports serves the well-known types bundled with protoc
+		// (timestamp.proto, wrappers.proto, descriptor.proto, …).
+		Resolver: protocompile.WithStandardImports(&setResolver{set: set}),
 	}
-	results, err := compiler.Compile(ctx, entries...)
+	results, err := compiler.Compile(ctx, set.names...)
 	if err != nil {
-		return nil, model.NewError(model.CodeProtoError, "failed to compile proto files").
-			WithDetail(err.Error())
+		return nil, compileError(err, set)
 	}
 
 	var files []model.ProtoFileInfo
@@ -133,7 +97,9 @@ func (im *Importer) Import(ctx context.Context, paths []string) ([]model.ProtoFi
 		// linker.File embeds protoreflect.FileDescriptor.
 		fd := protoreflect.FileDescriptor(res)
 		info := model.ProtoFileInfo{
-			Name:    filepath.Base(fd.Path()),
+			// Keep the full import path so users can tell two files with the
+			// same base name apart.
+			Name:    fd.Path(),
 			Package: string(fd.Package()),
 		}
 		mds := fd.Messages()

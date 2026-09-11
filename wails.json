@@ -6,6 +6,13 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "companyName": "SH Wang",
+    "productName": "Etcura",
+    "productVersion": "0.0.2",
+    "copyright": "Copyright 2026 SH Wang",
+    "comments": "A lightweight, cross-platform etcd desktop client."
+  },
   "author": {
     "name": "SH Wang",
     "email": "52746618+SH-Wang123@users.noreply.github.com"

@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	appDirName   = "etcura"
-	fileName     = "connections.json"
-	keyringUser  = "etcura"
+	appDirName     = "etcura"
+	fileName       = "connections.json"
+	settingsFile   = "settings.json"
+	keyringUser    = "etcura"
 	keyringService = "etcura"
 )
 
@@ -37,7 +38,9 @@ type keyringBackendT interface {
 
 type keyringBackendImpl struct{}
 
-func (keyringBackendImpl) Set(user, password string) error { return keyring.Set(keyringService, user, password) }
+func (keyringBackendImpl) Set(user, password string) error {
+	return keyring.Set(keyringService, user, password)
+}
 func (keyringBackendImpl) Get(user string) (string, error) { return keyring.Get(keyringService, user) }
 func (keyringBackendImpl) Delete(user string) error        { return keyring.Delete(keyringService, user) }
 
@@ -146,6 +149,62 @@ func DeletePassword(connectionID string) error {
 	}
 	if err := keyringBackend.Delete(connectionID); err != nil && !errors.Is(err, keyring.ErrNotFound) {
 		return fmt.Errorf("keychain delete: %w", err)
+	}
+	return nil
+}
+
+// Settings holds app-level preferences that are not tied to one connection.
+type Settings struct {
+	// Script is the post-processing snippet applied to values. Nil means no
+	// script is configured.
+	Script *model.ScriptConfig `json:"script,omitempty"`
+}
+
+func settingsPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, settingsFile), nil
+}
+
+// LoadSettings reads app settings; a missing file yields zero values.
+func LoadSettings() (Settings, error) {
+	var st Settings
+	path, err := settingsPath()
+	if err != nil {
+		return st, err
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return st, nil
+	}
+	if err != nil {
+		return st, model.NewError(model.CodeConfigError, "cannot read settings file").WithDetail(err.Error())
+	}
+	if err := json.Unmarshal(data, &st); err != nil {
+		return st, model.NewError(model.CodeConfigError, "settings file is corrupted, using defaults").
+			WithDetail(err.Error())
+	}
+	return st, nil
+}
+
+// SaveSettings writes app settings atomically.
+func SaveSettings(st Settings) error {
+	path, err := settingsPath()
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(st, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return model.NewError(model.CodeConfigError, "cannot write settings file").WithDetail(err.Error())
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return model.NewError(model.CodeConfigError, "cannot replace settings file").WithDetail(err.Error())
 	}
 	return nil
 }

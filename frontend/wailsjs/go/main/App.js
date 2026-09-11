@@ -6,6 +6,10 @@ export function ClearProtos() {
   return window['go']['main']['App']['ClearProtos']();
 }
 
+export function ClearScript() {
+  return window['go']['main']['App']['ClearScript']();
+}
+
 export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
@@ -32,6 +36,10 @@ export function GetConnection(arg1) {
 
 export function GetKey(arg1) {
   return window['go']['main']['App']['GetKey'](arg1);
+}
+
+export function GetScript() {
+  return window['go']['main']['App']['GetScript']();
 }
 
 export function GetStatus() {
@@ -62,12 +70,20 @@ export function MatchProto(arg1) {
   return window['go']['main']['App']['MatchProto'](arg1);
 }
 
+export function RunScript(arg1) {
+  return window['go']['main']['App']['RunScript'](arg1);
+}
+
 export function SaveConnection(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveConnection'](arg1, arg2, arg3);
 }
 
 export function SaveKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveKey'](arg1, arg2, arg3);
+}
+
+export function SetScript(arg1) {
+  return window['go']['main']['App']['SetScript'](arg1);
 }
 
 export function TestConnection(arg1, arg2) {

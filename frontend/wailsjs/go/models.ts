@@ -302,6 +302,68 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class ScriptConfig {
+	    language: string;
+	    inputVar: string;
+	    outputVar: string;
+	    body: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScriptConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.language = source["language"];
+	        this.inputVar = source["inputVar"];
+	        this.outputVar = source["outputVar"];
+	        this.body = source["body"];
+	    }
+	}
+	export class ScriptInfo {
+	    configured: boolean;
+	    language: string;
+	    inputVar: string;
+	    outputVar: string;
+	    interpreter: string;
+	    available: boolean;
+	    warning?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScriptInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.configured = source["configured"];
+	        this.language = source["language"];
+	        this.inputVar = source["inputVar"];
+	        this.outputVar = source["outputVar"];
+	        this.interpreter = source["interpreter"];
+	        this.available = source["available"];
+	        this.warning = source["warning"];
+	    }
+	}
+	export class ScriptOutput {
+	    output: string;
+	    stderr: string;
+	    exitCode: number;
+	    durationMs: number;
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScriptOutput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.output = source["output"];
+	        this.stderr = source["stderr"];
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	        this.truncated = source["truncated"];
+	    }
+	}
 	export class StatusInfo {
 	    state: string;
 	    name: string;

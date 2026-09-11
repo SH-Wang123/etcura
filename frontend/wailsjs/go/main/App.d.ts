@@ -4,6 +4,8 @@ import {model} from '../models';
 
 export function ClearProtos():Promise<void>;
 
+export function ClearScript():Promise<void>;
+
 export function Connect(arg1:string):Promise<model.StatusInfo>;
 
 export function CreateKey(arg1:string,arg2:string,arg3:string):Promise<model.KvDetail>;
@@ -17,6 +19,8 @@ export function Disconnect():Promise<model.StatusInfo>;
 export function GetConnection(arg1:string):Promise<model.ConnectionConfig>;
 
 export function GetKey(arg1:string):Promise<model.KvDetail>;
+
+export function GetScript():Promise<model.ScriptInfo>;
 
 export function GetStatus():Promise<model.StatusInfo>;
 
@@ -32,8 +36,12 @@ export function ListProtos():Promise<Array<model.ProtoFileInfo>>;
 
 export function MatchProto(arg1:string):Promise<model.ProtoMatchResult>;
 
+export function RunScript(arg1:string):Promise<model.ScriptOutput>;
+
 export function SaveConnection(arg1:model.ConnectionConfig,arg2:string,arg3:boolean):Promise<model.ConnectionConfig>;
 
 export function SaveKey(arg1:string,arg2:string,arg3:number):Promise<model.KvDetail>;
+
+export function SetScript(arg1:model.ScriptConfig):Promise<model.ScriptInfo>;
 
 export function TestConnection(arg1:model.ConnectionConfig,arg2:string):Promise<model.StatusResponse>;

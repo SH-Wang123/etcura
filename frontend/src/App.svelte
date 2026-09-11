@@ -8,9 +8,11 @@
   import NewKeyDialog from './components/NewKeyDialog.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import ProtoDialog from './components/ProtoDialog.svelte';
+  import ScriptDialog from './components/ScriptDialog.svelte';
   import Toast from './components/Toast.svelte';
   import { loadConnections, refreshStatus, status } from './stores/connections';
   import { importedProtos, loadProtos } from './stores/protos';
+  import { scriptInfo, loadScript } from './stores/script';
   import {
     selectedPrefix,
     refreshAll,
@@ -37,10 +39,15 @@
   let protoDialogOpen = false;
   $: protoCount = $importedProtos.reduce((a, f) => a + f.messageCount, 0);
 
+  // Post-processing script dialog state
+  let scriptDialogOpen = false;
+  $: scriptName = $scriptInfo?.configured ? $scriptInfo.language : '';
+
   onMount(() => {
     void loadConnections();
     void refreshStatus();
     void loadProtos();
+    void loadScript();
   });
 
   function openAddConnection(): void {
@@ -104,7 +111,14 @@
 <svelte:window on:keydown={onKeydown} />
 
 <div class="app">
-  <Toolbar bind:searchEl protoCount={protoCount} on:newkey={openNewKey} on:protos={() => (protoDialogOpen = true)} />
+  <Toolbar
+    bind:searchEl
+    {protoCount}
+    {scriptName}
+    on:newkey={openNewKey}
+    on:protos={() => (protoDialogOpen = true)}
+    on:script={() => (scriptDialogOpen = true)}
+  />
   <Sidebar on:add={openAddConnection} on:edit={(e) => void openEditConnection(e.detail)} />
   <KeyTree />
   <Inspector />
@@ -148,6 +162,10 @@
 
 {#if protoDialogOpen}
   <ProtoDialog on:close={() => (protoDialogOpen = false)} />
+{/if}
+
+{#if scriptDialogOpen}
+  <ScriptDialog on:close={() => (scriptDialogOpen = false)} />
 {/if}
 
 <ConfirmDialog />

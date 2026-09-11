@@ -12,6 +12,7 @@ import (
 	"etcura/internal/etcd"
 	"etcura/internal/model"
 	"etcura/internal/protodec"
+	"etcura/internal/script"
 )
 
 // App is the Wails binding surface. It contains no etcd logic of its own: it
@@ -34,10 +35,23 @@ type App struct {
 	// protos holds the compiled descriptor set of imported .proto files for
 	// heuristic protobuf value matching.
 	protos *protodec.Importer
+
+	// script runs the user-chosen post-processing script over values.
+	script *script.Runner
 }
 
 func NewApp() *App {
-	return &App{mgr: etcd.NewManager(), protos: protodec.NewImporter()}
+	app := &App{
+		mgr:    etcd.NewManager(),
+		protos: protodec.NewImporter(),
+		script: script.NewRunner(),
+	}
+	// Re-apply the persisted script. A configuration that no longer validates
+	// is ignored rather than preventing startup.
+	if st, err := config.LoadSettings(); err == nil {
+		_ = app.script.Restore(st.Script)
+	}
+	return app
 }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
@@ -304,7 +318,8 @@ func (a *App) ListLevel(prefix, cursor string, pageSize int) (model.LevelPage, e
 
 // GetKey loads the full record (value included) for the selected key. Rapid
 // selection changes cancel the previous load.
-func (a *App) GetKey(key string) (model.KvDetail, error) {	client, err := a.mgr.Client()
+func (a *App) GetKey(key string) (model.KvDetail, error) {
+	client, err := a.mgr.Client()
 	if err != nil {
 		return model.KvDetail{}, err
 	}
@@ -391,6 +406,52 @@ func (a *App) MatchProto(valueBase64 string) (model.ProtoMatchResult, error) {
 	defer cancel()
 	_ = ctx // matching is pure CPU over in-memory descriptors
 	return a.protos.Match(value), nil
+}
+
+// ------------------------------------------------------------------ script
+
+// SetScript stores the post-processing snippet. The app wraps the body with
+// the configured input/output variable bindings: the raw value bytes are bound
+// to InputVar, and OutputVar is read back as the displayed result. Either name
+// may be empty (no input binding / display stdout respectively). The raw bytes
+// always reach the script's stdin as well.
+func (a *App) SetScript(cfg model.ScriptConfig) (model.ScriptInfo, error) {
+	if err := a.script.Set(cfg); err != nil {
+		return model.ScriptInfo{}, err
+	}
+	stored := a.script.Config()
+	info := a.script.Info()
+	if stored == nil || info == nil {
+		return model.ScriptInfo{}, model.NewError(model.CodeScriptError, "Script was not configured")
+	}
+	if err := config.SaveSettings(config.Settings{Script: stored}); err != nil {
+		return *info, err
+	}
+	return *info, nil
+}
+
+// ClearScript removes the configured script.
+func (a *App) ClearScript() error {
+	a.script.Clear()
+	return config.SaveSettings(config.Settings{})
+}
+
+// GetScript reports the configured script, or a zero value when none is set.
+func (a *App) GetScript() model.ScriptInfo {
+	if info := a.script.Info(); info != nil {
+		return *info
+	}
+	return model.ScriptInfo{}
+}
+
+// RunScript runs the configured snippet over the value (base64) and returns
+// its output for display.
+func (a *App) RunScript(valueBase64 string) (model.ScriptOutput, error) {
+	value, err := decodeValue(valueBase64)
+	if err != nil {
+		return model.ScriptOutput{}, err
+	}
+	return a.script.Run(a.ctx, value)
 }
 
 // ------------------------------------------------------------------ internals

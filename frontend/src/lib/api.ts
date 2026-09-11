@@ -21,6 +21,10 @@ import {
   SaveKey as _saveKey,
   TestConnection as _testConnection,
   ClearProtos as _clearProtos,
+  SetScript as _setScript,
+  ClearScript as _clearScript,
+  GetScript as _getScript,
+  RunScript as _runScript,
 } from '../../wailsjs/go/main/App';
 import type {
   AppErrorShape,
@@ -30,6 +34,9 @@ import type {
   ProtoFileInfo,
   ProtoMatchResult,
   LevelPage,
+  ScriptConfig,
+  ScriptInfo,
+  ScriptOutput,
   StatusInfo,
   StatusResponse,
 } from './types';
@@ -136,6 +143,22 @@ export const api = {
   clearProtos(): Promise<void> {
     bindings();
     return _clearProtos();
+  },
+  setScript(cfg: ScriptConfig): Promise<ScriptInfo> {
+    bindings();
+    return _setScript(cfg as unknown as never) as unknown as Promise<ScriptInfo>;
+  },
+  clearScript(): Promise<void> {
+    bindings();
+    return _clearScript();
+  },
+  getScript(): Promise<ScriptInfo> {
+    bindings();
+    return _getScript() as unknown as Promise<ScriptInfo>;
+  },
+  runScript(valueBase64: string): Promise<ScriptOutput> {
+    bindings();
+    return _runScript(valueBase64) as Promise<ScriptOutput>;
   },
   getKey(key: string): Promise<KvDetail> {
     bindings();

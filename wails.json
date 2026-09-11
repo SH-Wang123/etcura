@@ -9,7 +9,7 @@
   "info": {
     "companyName": "SH Wang",
     "productName": "Etcura",
-    "productVersion": "0.0.2",
+    "productVersion": "0.0.3",
     "copyright": "Copyright 2026 SH Wang",
     "comments": "A lightweight, cross-platform etcd desktop client."
   },

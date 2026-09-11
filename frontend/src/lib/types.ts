@@ -88,6 +88,35 @@ export interface ProtoMatchResult {
   candidates: ProtoCandidate[];
 }
 
+export type ScriptLanguage = 'python' | 'node' | 'ruby' | 'shell';
+
+export interface ScriptConfig {
+  language: ScriptLanguage;
+  /** Variable the raw value bytes are bound to ("" = not bound). */
+  inputVar: string;
+  /** Variable read back as the displayed result ("" = use stdout). */
+  outputVar: string;
+  body: string;
+}
+
+export interface ScriptInfo {
+  configured: boolean;
+  language: ScriptLanguage;
+  inputVar: string;
+  outputVar: string;
+  interpreter: string;
+  available: boolean;
+  warning?: string;
+}
+
+export interface ScriptOutput {
+  output: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  truncated: boolean;
+}
+
 export interface StatusResponse {
   ok: boolean;
   header: number;

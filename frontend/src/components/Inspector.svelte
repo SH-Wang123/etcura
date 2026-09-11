@@ -11,6 +11,14 @@
   } from '../stores/keys';
   import { status } from '../stores/connections';
   import { importedProtos } from '../stores/protos';
+  import {
+    scriptInfo,
+    scriptOutput,
+    scriptRunning,
+    scriptError,
+    runScriptOver,
+    resetScriptOutput,
+  } from '../stores/script';
   import { api, localizeError } from '../lib/api';
   import { askConfirm } from '../lib/confirm';
   import { toast } from '../lib/toast';
@@ -29,7 +37,7 @@
     formatBytes,
   } from '../lib/base64';
 
-  type ViewMode = 'text' | 'hex' | 'base64' | 'proto';
+  type ViewMode = 'text' | 'hex' | 'base64' | 'proto' | 'script';
 
   let mode: ViewMode = 'text';
   let text = '';
@@ -51,17 +59,24 @@
   // would register a dependency, so every view switch would re-run this block
   // and instantly reset the mode (that was a real bug once).
   $: if ($detail) {
-    const initialMode: ViewMode = $detail.isUTF8 ? 'text' : 'hex';
+    // Binary values default to the post-processing script when one is
+    // configured (its output is what the user asked to see); plain text keeps
+    // the text view but can still switch to Script.
+    const scriptActive = !!$scriptInfo;
+    const initialMode: ViewMode = scriptActive && !$detail.isUTF8 ? 'script' : $detail.isUTF8 ? 'text' : 'hex';
     originalBytes = b64ToBytes($detail.valueBase64);
     mode = initialMode;
-    text = render(originalBytes, initialMode);
+    text = render(originalBytes, initialMode === 'script' ? 'text' : initialMode);
     protoResult = null;
     protoSelected = 0;
+    resetScriptOutput();
     void autoMatch($detail.valueBase64, $detail.sizeBytes, protoCount);
+    if (scriptActive) void runScriptOver($detail.valueBase64);
   } else {
     originalBytes = new Uint8Array(0);
     text = '';
     protoResult = null;
+    resetScriptOutput();
   }
 
   $: protoCount = $importedProtos.reduce((a, f) => a + f.messageCount, 0);
@@ -92,9 +107,31 @@
     ? (prettyJSON(protoCandidate.json) ?? protoCandidate.json)
     : $t('inspector.protoTooLarge');
 
+  // One-line description of the active binding, shown above the Script view.
+  $: scriptBindingNote = (() => {
+    const info = $scriptInfo;
+    if (!info) return '';
+    const parts: string[] = [$t('script.modeTip')];
+    parts.push(info.inputVar ? $t('script.inputNote', { v: info.inputVar }) : $t('script.inputNoteEmpty'));
+    parts.push(info.outputVar ? $t('script.outputNote', { v: info.outputVar }) : $t('script.outputNoteEmpty'));
+    return parts.join(' ');
+  })();
+
+  // What the Script view shows: stdout, or the failure details.
+  $: scriptText = (() => {
+    if ($scriptError) return `${$t('script.failed')}: ${$scriptError}`;
+    const out = $scriptOutput;
+    if (!out) return '';
+    if (out.exitCode !== 0) {
+      const body = out.stderr.trim() || out.output.trim();
+      return `${$t('script.failed')} (${$t('script.exitCode', { code: out.exitCode, ms: out.durationMs })})\n\n${body}`;
+    }
+    return out.output;
+  })();
+
   function switchMode(m: ViewMode): void {
     if (m === mode) return;
-    if (mode !== 'proto') {
+    if (mode !== 'proto' && mode !== 'script') {
       // Leaving an editable mode: carry the buffer over to the new encoding.
       const current = encodeBytes(mode, text);
       if (!current) return;
@@ -111,7 +148,7 @@
   // statement calling a closure would never see `text`/`mode` updates (no
   // syntactic dependency).
   function encodeBytes(m: ViewMode, s: string): Uint8Array | null {
-    if (m === 'proto') {
+    if (m === 'proto' || m === 'script') {
       return null;
     }
     if (m === 'hex') {
@@ -137,6 +174,9 @@
         $detail.sizeBytes > LARGE_VALUE ? $t('badge.large', { size: formatBytes($detail.sizeBytes) }) : null,
         isJSON ? $t('badge.json') : null,
         protoCandidate ? $t('badge.proto', { name: protoCandidate.messageName }) : null,
+        mode === 'script' && $scriptOutput && $scriptOutput.exitCode === 0 && $scriptOutput.truncated
+          ? $t('script.truncated')
+          : null,
       ].filter((b): b is string => b !== null))
     : [];
 
@@ -234,12 +274,25 @@
           <select
             class="proto-pick mono"
             bind:value={protoSelected}
-            title="Candidate message type (ranked by match score)"
+            title={$t('inspector.candidateTip')}
           >
             {#each protoResult.candidates as c, idx (c.messageName)}
               <option value={idx}>{c.messageName} ({c.score})</option>
             {/each}
           </select>
+        {/if}
+        {#if $scriptInfo}
+          <button
+            class="btn btn-tiny"
+            class:active={mode === 'script'}
+            on:click={() => switchMode('script')}
+            title={$t('script.modeTip')}
+          >
+            {$t('btn.script')}
+          </button>
+          {#if $scriptRunning}
+            <span class="spinner" />
+          {/if}
         {/if}
       </div>
       <span class="spacer" />
@@ -259,12 +312,21 @@
       <div class="invalid">{mode === 'hex' ? $t('inspector.invalidHex') : $t('inspector.invalidBase64')}</div>
     {/if}
     {#if mode === 'proto'}
-      <div class="invalid proto-note">
-        Read-only decode of the protobuf value (score-ranked candidates). Switch to Text/Hex/Base64 to edit.
-      </div>
+      <div class="invalid proto-note">{$t('inspector.protoNote')}</div>
+    {/if}
+    {#if mode === 'script'}
+      <div class="invalid proto-note">{scriptBindingNote}</div>
     {/if}
 
-    {#if mode === 'proto'}
+    {#if mode === 'script'}
+      <textarea
+        class="editor mono"
+        readonly
+        value={$scriptRunning ? $t('script.running') : scriptText}
+        wrap="soft"
+        spellcheck="false"
+      />
+    {:else if mode === 'proto'}
       <textarea
         class="editor mono"
         readonly

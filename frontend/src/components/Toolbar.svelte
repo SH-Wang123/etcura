@@ -17,7 +17,10 @@
   /** Number of imported proto message types (badge on the Protos button). */
   export let protoCount = 0;
 
-  const dispatch = createEventDispatcher<{ newkey: void; protos: void }>();
+  /** Active post-processing script label ("" when none). */
+  export let scriptName = '';
+
+  const dispatch = createEventDispatcher<{ newkey: void; protos: void; script: void }>();
 
   let search = $basePath;
   let baseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -98,6 +101,14 @@
   <div class="actions">
     <button class="btn" on:click={() => dispatch('protos')} title={$t('tip.protos')}>
       {$t('btn.protos')}{protoCount > 0 ? ` (${protoCount})` : ''}
+    </button>
+    <button
+      class="btn"
+      class:active={scriptName !== ''}
+      on:click={() => dispatch('script')}
+      title={$t('tip.script')}
+    >
+      {$t('btn.script')}{scriptName !== '' ? ` · ${scriptName}` : ''}
     </button>
     <button class="btn" on:click={onNewKey} disabled={$status.state !== 'connected'} title={$t('tip.newKey')}>
       {$t('btn.newKey')}

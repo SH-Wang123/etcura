@@ -50,6 +50,11 @@ never loads the whole database.
   ranking); read-only Proto view shows decoded JSON; candidates are switchable; import
   failures are reported inline with actionable detail (`file:line` plus the import
   resolution mapping)
+- **Post-processing scripts**: attach a snippet (Python 3 / Node.js / Ruby / Shell) to your
+  values — the app binds the raw bytes to an input variable you name, runs it, then reads
+  the output variable you name and displays it. Either name can be empty (no input binding
+  / show stdout), and the bytes always arrive on stdin too. Binary values open in the script
+  view automatically, and failures show the exit code plus the interpreter's stderr
 - **Safe writes**: creating checks existence first (overwrite requires confirmation); saving
   uses `Txn + Compare(ModRevision)` CAS — on conflict you are asked to reload, never
   silently overwritten; deletes are single-key only and always confirmed (server + full key

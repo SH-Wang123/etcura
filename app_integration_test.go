@@ -66,6 +66,14 @@ func TestIntegrationWriteSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	updated, err := app.SaveKey(a.Session, key, "YWJj", ad.ModRevision)
+	if err != nil || updated.ValueBase64 != "YWJj" {
+		t.Fatalf("independent first tab: %+v, %v", updated, err)
+	}
+	if len(app.ListSessions()) != 2 {
+		t.Fatal("both sessions should still be open")
+	}
+	app.Disconnect(a.Session)
 	_, err = app.SaveKey(a.Session, key, "YQ==", bd.ModRevision)
 	expectError(err, model.CodeConnectionChanged)
 	expectError(app.DeleteKey(a.Session, key, bd.ModRevision), model.CodeConnectionChanged)
@@ -78,6 +86,7 @@ func TestIntegrationWriteSession(t *testing.T) {
 		t.Fatalf("unexpected record in second cluster: %+v, %v", d, err)
 	}
 
+	app.Disconnect(b.Session)
 	locked := connect("b", []string{second}, true)
 	_, err = app.GetKey(locked.Session, key)
 	if err != nil {
@@ -93,7 +102,7 @@ func TestIntegrationWriteSession(t *testing.T) {
 
 	a = connect("a", []string{first}, false)
 	d, err = app.GetKey(a.Session, key)
-	if err != nil || d.ValueBase64 != ad.ValueBase64 {
+	if err != nil || d.ValueBase64 != updated.ValueBase64 {
 		t.Fatalf("unexpected record in first cluster: %+v, %v", d, err)
 	}
 }

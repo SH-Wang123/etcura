@@ -1,21 +1,12 @@
 <script lang="ts">
-  import { status } from '../stores/connections';
-  import {
-    basePath,
-    selectedPrefix,
-    treeRev,
-    treeReset,
-    pageSize,
-    setPageSize,
-    selectTreePrefix,
-    selectKeyPath,
-    refreshAll,
-  } from '../stores/keys';
+  import { useBrowser } from '../stores/keys';
   import { api, localizeError } from '../lib/api';
   import { toast } from '../lib/toast';
   import { t } from '../lib/i18n';
-  import { detailLoading } from '../stores/keys';
   import type { LevelRow } from '../lib/types';
+
+  const { status, basePath, selectedPrefix, treeRev, treeReset, pageSize, setPageSize,
+    selectTreePrefix, selectKeyPath, refreshAll, detailLoading } = useBrowser();
 
   interface TreeChildren {
     rows: LevelRow[];

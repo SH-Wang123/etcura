@@ -13,6 +13,7 @@ import (
 	"etcura/internal/model"
 	"etcura/internal/protodec"
 	"etcura/internal/script"
+	"etcura/internal/workbench"
 )
 
 // App is the Wails binding surface. It contains no etcd logic of its own: it
@@ -20,9 +21,10 @@ import (
 // and the config store, and enforces the cancellation policy for UI-driven
 // requests that can be superseded by newer ones.
 type App struct {
+	workbench  *workbench.Engine
 	ctx        context.Context
 	mgr        *etcd.Manager
-	profilesMu sync.Mutex
+	profilesMu sync.RWMutex
 
 	// protos holds the compiled descriptor set of imported .proto files for
 	// heuristic protobuf value matching.
@@ -40,6 +42,7 @@ func NewApp() *App {
 	}
 	// Re-apply the persisted script. A configuration that no longer validates
 	// is ignored rather than preventing startup.
+	app.workbench = workbench.New(app.mgr)
 	if st, err := config.LoadSettings(); err == nil {
 		_ = app.script.Restore(st.Script)
 	}
@@ -48,7 +51,12 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
-func (a *App) shutdown(_ context.Context) { a.mgr.Disconnect() }
+func (a *App) shutdown(_ context.Context) {
+	if a.workbench != nil {
+		a.workbench.Close()
+	}
+	a.mgr.Close()
+}
 
 // ---------------------------------------------------------------- connections
 
@@ -87,7 +95,6 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 	}
 
 	isNew := cfg.ID == ""
-	readOnlyChanged := false
 	if isNew {
 		id, err := newID()
 		if err != nil {
@@ -99,7 +106,6 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 		for _, c := range conns {
 			if c.ID == cfg.ID {
 				found = true
-				readOnlyChanged = c.ReadOnly != cfg.ReadOnly
 				break
 			}
 		}
@@ -132,7 +138,7 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 	if err := config.Save(conns); err != nil {
 		return model.ConnectionConfig{}, err
 	}
-	if readOnlyChanged {
+	if !isNew {
 		a.mgr.DisconnectProfile(cfg.ID)
 	}
 	return cfg, nil
@@ -216,6 +222,8 @@ func (a *App) TestConnection(cfg model.ConnectionConfig, password string) (model
 // Connect switches to the profile with the given id: close old client, dial,
 // verify with Status, update the connection state.
 func (a *App) Connect(id string) (model.StatusInfo, error) {
+	a.profilesMu.RLock()
+	defer a.profilesMu.RUnlock()
 	if id == "" {
 		return model.StatusInfo{}, model.NewInvalidArgument("connection id must not be empty")
 	}
@@ -241,14 +249,11 @@ func (a *App) Connect(id string) (model.StatusInfo, error) {
 	return a.mgr.Connect(ctx, cfg, password)
 }
 
-// Disconnect closes the active connection.
-func (a *App) Disconnect() (model.StatusInfo, error) {
-	a.mgr.Disconnect()
-	return a.mgr.Status(), nil
-}
+// Disconnect closes the client for a single workspace tab.
+func (a *App) Disconnect(session string) { a.mgr.Disconnect(session) }
 
-// GetStatus reports the current connection state for the status bar.
-func (a *App) GetStatus() model.StatusInfo { return a.mgr.Status() }
+// ListSessions reports all open connections.
+func (a *App) ListSessions() []model.StatusInfo { return a.mgr.Status() }
 
 // ---------------------------------------------------------------------- keys
 

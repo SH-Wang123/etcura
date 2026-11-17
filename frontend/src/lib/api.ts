@@ -11,7 +11,7 @@ import {
   Disconnect as _disconnect,
   GetConnection as _getConnection,
   GetKey as _getKey,
-  GetStatus as _getStatus,
+  ListSessions as _listSessions,
   ImportProtos as _importProtos,
   ListConnections as _listConnections,
   ListProtos as _listProtos,
@@ -116,13 +116,13 @@ export const api = {
     bindings();
     return _connect(id) as Promise<StatusInfo>;
   },
-  disconnect(): Promise<StatusInfo> {
+  disconnect(session: string): Promise<void> {
     bindings();
-    return _disconnect() as Promise<StatusInfo>;
+    return _disconnect(session);
   },
-  getStatus(): Promise<StatusInfo> {
+  listSessions(): Promise<StatusInfo[]> {
     bindings();
-    return _getStatus() as Promise<StatusInfo>;
+    return _listSessions() as Promise<StatusInfo[]>;
   },
   listLevel(session: string, prefix: string, cursor: string, pageSize: number): Promise<LevelPage> {
     bindings();

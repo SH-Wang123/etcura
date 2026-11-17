@@ -12,13 +12,6 @@ export function emptyScriptConfig(): ScriptConfig {
 /** The configured snippet (null when none). */
 export const scriptInfo = writable<ScriptInfo | null>(null);
 
-/** Output of the last run for the currently selected key. */
-export const scriptOutput = writable<ScriptOutput | null>(null);
-export const scriptRunning = writable(false);
-export const scriptError = writable<string | null>(null);
-
-let runGen = 0;
-
 function configured(): boolean {
   return get(scriptInfo)?.configured === true;
 }
@@ -36,8 +29,6 @@ export async function saveScript(cfg: ScriptConfig): Promise<boolean> {
   try {
     const info = await api.setScript(cfg);
     scriptInfo.set(info);
-    scriptOutput.set(null);
-    scriptError.set(null);
     if (info.warning) {
       toast(info.warning, 'error');
     } else {
@@ -55,46 +46,50 @@ export async function clearScript(): Promise<void> {
   try {
     await api.clearScript();
     scriptInfo.set(null);
-    scriptOutput.set(null);
-    scriptError.set(null);
     toast(tr('script.clearedToast'), 'success');
   } catch (e) {
     toast(localizeError(e).message, 'error');
   }
 }
 
-/**
- * Runs the snippet over the given value. Superseding runs are tracked with a
- * generation counter so a slow run cannot overwrite a newer result.
- */
-export async function runScriptOver(valueBase64: string): Promise<void> {
-  if (!configured()) return;
-  const gen = ++runGen;
-  scriptRunning.set(true);
-  scriptError.set(null);
-  try {
-    const out = await api.runScript(valueBase64);
-    if (gen !== runGen) return;
-    scriptOutput.set(out);
-  } catch (e) {
-    if (gen !== runGen) return;
-    const err = localizeError(e);
-    scriptOutput.set(null);
-    scriptError.set(err.message);
-  } finally {
-    if (gen === runGen) scriptRunning.set(false);
+export function createScriptRun() {
+  /** Output of the last run for the currently selected key. */
+  const scriptOutput = writable<ScriptOutput | null>(null);
+  const scriptRunning = writable(false);
+  const scriptError = writable<string | null>(null);
+
+  let runGen = 0;
+
+  /**
+   * Runs the snippet over the given value. Superseding runs are tracked with a
+   * generation counter so a slow run cannot overwrite a newer result.
+   */
+  async function runScriptOver(valueBase64: string): Promise<void> {
+    if (!configured()) return;
+    const gen = ++runGen;
+    scriptRunning.set(true);
+    scriptError.set(null);
+    try {
+      const out = await api.runScript(valueBase64);
+      if (gen !== runGen) return;
+      scriptOutput.set(out);
+    } catch (e) {
+      if (gen !== runGen) return;
+      const err = localizeError(e);
+      scriptOutput.set(null);
+      scriptError.set(err.message);
+    } finally {
+      if (gen === runGen) scriptRunning.set(false);
+    }
   }
-}
 
-/** Re-runs the snippet for the currently selected value. */
-export async function rerunScript(valueBase64: string): Promise<void> {
-  await runScriptOver(valueBase64);
-}
+  /** Drops any result (e.g. when the selection changes). */
+  function resetScriptOutput(): void {
+    ++runGen;
+    scriptOutput.set(null);
+    scriptError.set(null);
+    scriptRunning.set(false);
+  }
 
-/** Drops any result (e.g. when the selection changes). */
-export function resetScriptOutput(): void {
-  ++runGen;
-  scriptOutput.set(null);
-  scriptError.set(null);
-  scriptRunning.set(false);
+  return { scriptOutput, scriptRunning, scriptError, runScriptOver, resetScriptOutput };
 }

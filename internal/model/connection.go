@@ -34,6 +34,7 @@ type TLSConfig struct {
 type ConnectionConfig struct {
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`
+	Environment      string    `json:"environment,omitempty"`
 	Endpoints        []string  `json:"endpoints"`
 	Username         string    `json:"username,omitempty"`
 	DialTimeoutMs    int       `json:"dialTimeoutMs"`
@@ -59,6 +60,7 @@ type StatusInfo struct {
 	Session     string `json:"session"`
 	ReadOnly    bool   `json:"readOnly"`
 	Name        string `json:"name"`
+	Environment string `json:"environment"`
 	Endpoints   string `json:"endpoints"`
 	Header      int64  `json:"header"`
 	EtcdVersion string `json:"etcdVersion"`

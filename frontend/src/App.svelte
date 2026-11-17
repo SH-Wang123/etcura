@@ -1,47 +1,30 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import Toolbar from './components/Toolbar.svelte';
+  import { onMount } from 'svelte';
   import Sidebar from './components/Sidebar.svelte';
-  import KeyTree from './components/KeyTree.svelte';
-  import Inspector from './components/Inspector.svelte';
   import ConnectionDialog from './components/ConnectionDialog.svelte';
-  import NewKeyDialog from './components/NewKeyDialog.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import ProtoDialog from './components/ProtoDialog.svelte';
   import ScriptDialog from './components/ScriptDialog.svelte';
   import Toast from './components/Toast.svelte';
-  import { connections, loadConnections, refreshStatus, status } from './stores/connections';
-  import { importedProtos, loadProtos } from './stores/protos';
-  import { scriptInfo, loadScript } from './stores/script';
-  import {
-    selectedPrefix,
-    refreshAll,
-    requestSave,
-    updateDetail,
-    bumpTree,
-  } from './stores/keys';
-  import { api } from './lib/api';
-  import { t } from './lib/i18n';
-  import { newConnectionForm } from './lib/types';
-  import type { ConnectionConfig, KvDetail } from './lib/types';
+  import SessionPane from './components/SessionPane.svelte';
+  import ComparePane from './components/ComparePane.svelte';
+  import WatchPane from './components/WatchPane.svelte';
+  import { connections, loadConnections, refreshStatus, activeSession, sessions, disconnect } from './stores/connections';
+  import { loadProtos } from './stores/protos';
+  import { loadScript } from './stores/script';
+  import { api, localizeError } from './lib/api';
+  import { toast } from './lib/toast';
+  import { t, locale, locales, setLocale } from './lib/i18n';
+  import { sessionLabel } from './lib/workbench';
+  import { newConnectionForm, type ConnectionConfig } from './lib/types';
 
-  let searchEl: HTMLInputElement | null = null;
-
-  // Connection dialog state
+  let panel: 'browse' | 'compare' | 'watch' = 'browse';
   let connectionDialogOpen = false;
   let dialogForm: ConnectionConfig = newConnectionForm();
   let editingHasPassword = false;
-
-  // New key dialog state
-  let newKeySession = '';
-
-  // Proto import dialog state
   let protoDialogOpen = false;
-  $: protoCount = $importedProtos.reduce((a, f) => a + f.messageCount, 0);
-
-  // Post-processing script dialog state
   let scriptDialogOpen = false;
-  $: scriptName = $scriptInfo?.configured ? $scriptInfo.language : '';
+  $: if ($activeSession) selectSession($activeSession);
 
   onMount(() => {
     void loadConnections();
@@ -50,6 +33,10 @@
     void loadScript();
   });
 
+  function selectSession(id: string): void {
+    if (id) panel = 'browse';
+  }
+
   function openAddConnection(): void {
     dialogForm = newConnectionForm();
     editingHasPassword = false;
@@ -57,9 +44,13 @@
   }
 
   async function openEditConnection(id: string): Promise<void> {
-    dialogForm = await api.getConnection(id);
-    editingHasPassword = $connections.find((c) => c.id === id)?.hasPassword ?? false;
-    connectionDialogOpen = true;
+    try {
+      dialogForm = await api.getConnection(id);
+      editingHasPassword = $connections.find((conn) => conn.id === id)?.hasPassword ?? false;
+      connectionDialogOpen = true;
+    } catch (error) {
+      toast(localizeError(error).message, 'error');
+    }
   }
 
   function onConnectionSaved(): void {
@@ -67,173 +58,71 @@
     void loadConnections();
     void refreshStatus();
   }
-
-  async function onKeyCreated(e: CustomEvent<KvDetail>): Promise<void> {
-    if (newKeySession !== $status.session) return;
-    newKeySession = '';
-    // Refresh the expanded branches in place so the tree keeps its shape; the
-    // new key appears if its parent directory is expanded.
-    bumpTree();
-    updateDetail(e.detail);
-  }
-
-  function openNewKey(): void {
-    if (!$status.session || $status.readOnly) return;
-    newKeySession = $status.session;
-  }
-
-  function onRefreshAll(): void {
-    if ($status.state === 'connected') {
-      void refreshAll();
-    }
-    void refreshStatus();
-  }
-
-  function onKeydown(e: KeyboardEvent): void {
-    const mod = e.metaKey || e.ctrlKey;
-    if (!mod) return;
-    const k = e.key.toLowerCase();
-    if (k === 'r') {
-      e.preventDefault();
-      onRefreshAll();
-    } else if (k === 'n') {
-      e.preventDefault();
-      openNewKey();
-    } else if (k === 's') {
-      e.preventDefault();
-      requestSave();
-    } else if (k === 'f') {
-      e.preventDefault();
-      searchEl?.focus();
-      searchEl?.select();
-    }
-  }
 </script>
 
-<svelte:window on:keydown={onKeydown} />
+<div class="workbench">
+  <Sidebar on:open={() => (panel = 'browse')} on:add={openAddConnection} on:edit={(event) => void openEditConnection(event.detail)} />
+  <main>
+    <header>
+      <div class="tabs" aria-label={$t('work.openSessions')}>
+        {#each $sessions as session (session.session)}
+          <div class="tab" class:chosen={panel === 'browse' && $activeSession === session.session}>
+            <button class="tab-name" title={session.endpoints} aria-pressed={panel === 'browse' && $activeSession === session.session}
+              on:click={() => { activeSession.set(session.session); panel = 'browse'; }}>
+              {sessionLabel(session)}{session.readOnly ? ` · ${$t('work.readOnlyShort')}` : ''}
+            </button>
+            <button class="close" aria-label={`${$t('sidebar.disconnect')} ${session.name}`} on:click={() => void disconnect(session.session)}>×</button>
+          </div>
+        {/each}
+      </div>
+      <nav>
+        <button class="btn" class:active={panel === 'compare'} on:click={() => (panel = 'compare')}>{$t('work.compare')}</button>
+        <button class="btn" class:active={panel === 'watch'} on:click={() => (panel = 'watch')}>{$t('work.watch')}</button>
+        {#if !$sessions.length || panel !== 'browse'}
+          <select value={$locale} aria-label={$t('locale.label')} on:change={(event) => setLocale(event.currentTarget.value as typeof $locale)}>
+            {#each locales as item (item.id)}<option value={item.id}>{item.label}</option>{/each}
+          </select>
+        {/if}
+      </nav>
+    </header>
 
-<div class="app">
-  <Toolbar
-    bind:searchEl
-    {protoCount}
-    {scriptName}
-    on:newkey={openNewKey}
-    on:protos={() => (protoDialogOpen = true)}
-    on:script={() => (scriptDialogOpen = true)}
-  />
-  <Sidebar on:add={openAddConnection} on:edit={(e) => void openEditConnection(e.detail)} />
-  <KeyTree />
-  <Inspector />
-
-  <footer class="statusbar">
-    <span class="dot {$status.state}" />
-    <span class="state">{$status.state === 'connected' ? $t('status.connected') : $status.state === 'disconnected' ? $t('status.disconnected') : $status.state === 'connecting' ? $t('status.connecting') : $t('status.error')}</span>
-    {#if $status.readOnly}<span>{$t('conn.readOnly')}</span>{/if}
-    {#if $status.endpoints}
-      <span class="sep">·</span>
-      <span class="endpoints">{$status.endpoints}</span>
-    {/if}
-    {#if $status.state === 'connected'}
-      <span class="sep">·</span>
-      <span>rev {$status.header}</span>
-      {#if $status.etcdVersion}
-        <span class="sep">·</span>
-        <span>etcd {$status.etcdVersion}</span>
+    <div class="content">
+      {#each $sessions as session (session.session)}
+        <SessionPane connection={session} active={panel === 'browse' && session.session === $activeSession}
+          on:protos={() => (protoDialogOpen = true)} on:script={() => (scriptDialogOpen = true)} />
+      {/each}
+      {#if panel === 'browse' && !$sessions.length}
+        <div class="empty"><h1>Etcura</h1><p>{$t('tree.connectFirst')}</p></div>
       {/if}
-    {/if}
-    {#if $status.message}
-      <span class="sep">·</span>
-      <span class="err" title={$status.message}>{$status.message}</span>
-    {/if}
-    <span class="spacer" />
-    <span class="hint">{$t('status.hint')}</span>
-  </footer>
+      <div class="tool" hidden={panel !== 'compare'}><ComparePane /></div>
+      <div class="tool" hidden={panel !== 'watch'}><WatchPane /></div>
+    </div>
+  </main>
 </div>
 
 {#if connectionDialogOpen}
-  <ConnectionDialog
-    config={dialogForm}
-    hasPassword={editingHasPassword}
-    on:saved={onConnectionSaved}
-    on:close={() => (connectionDialogOpen = false)}
-  />
+  <ConnectionDialog config={dialogForm} hasPassword={editingHasPassword} on:saved={onConnectionSaved} on:close={() => (connectionDialogOpen = false)} />
 {/if}
-
-{#if newKeySession && newKeySession === $status.session}
-  <NewKeyDialog session={newKeySession} defaultPrefix={$selectedPrefix} on:created={onKeyCreated} on:close={() => (newKeySession = '')} />
-{/if}
-
-{#if protoDialogOpen}
-  <ProtoDialog on:close={() => (protoDialogOpen = false)} />
-{/if}
-
-{#if scriptDialogOpen}
-  <ScriptDialog on:close={() => (scriptDialogOpen = false)} />
-{/if}
-
+{#if protoDialogOpen}<ProtoDialog on:close={() => (protoDialogOpen = false)} />{/if}
+{#if scriptDialogOpen}<ScriptDialog on:close={() => (scriptDialogOpen = false)} />{/if}
 <ConfirmDialog />
 <Toast />
 
 <style>
-  .app {
-    display: grid;
-    height: 100vh;
-    grid-template-rows: 42px 1fr 26px;
-    grid-template-columns: 210px minmax(320px, 1fr) minmax(360px, 460px);
-    grid-template-areas:
-      'toolbar toolbar toolbar'
-      'sidebar tree inspector'
-      'status status status';
-  }
-  .statusbar {
-    grid-area: status;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 10px;
-    font-size: 11px;
-    font-family: var(--mono);
-    color: var(--dim);
-    border-top: 1px solid var(--border);
-    background: var(--panel-alt);
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--dim);
-    flex: none;
-  }
-  .dot.connected {
-    background: var(--ok);
-  }
-  .dot.connecting {
-    background: var(--warning);
-  }
-  .dot.error {
-    background: var(--danger);
-  }
-  .state {
-    text-transform: capitalize;
-  }
-  .sep {
-    opacity: 0.5;
-  }
-  .endpoints {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .err {
-    color: var(--danger);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .hint {
-    opacity: 0.7;
-  }
+  .workbench { display: grid; grid-template: "sidebar workspace" minmax(0, 1fr) / 196px minmax(0, 1fr); height: 100vh; }
+  main { grid-area: workspace; min-width: 0; min-height: 0; display: grid; grid-template-rows: 46px minmax(0,1fr); }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 10px; border-bottom: 1px solid var(--border); background: var(--panel-alt); }
+  .tabs, nav { display: flex; align-items: center; gap: 6px; }
+  nav { flex-shrink: 0; }
+  .tabs { overflow-x: auto; min-width: 0; padding: 3px 0; }
+  .tab { display: flex; flex-shrink: 0; align-items: center; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .tab.chosen { background: var(--panel); border-color: var(--accent); }
+  .tab button { background: none; border: 0; color: var(--text); padding: 6px 8px; cursor: pointer; }
+  .tab-name { max-width: 160px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+  .tab .close { color: var(--dim); }
+  .tab .close:hover { color: var(--danger); }
+  .content, .tool { min-height: 0; height: 100%; }
+  .tool[hidden] { display: none; }
+  .empty { display: grid; place-content: center; text-align: center; height: 100%; color: var(--dim); }
+  .empty h1 { margin: 0; color: var(--text); font-size: 26px; font-weight: 650; }
 </style>

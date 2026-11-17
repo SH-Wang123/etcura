@@ -1,15 +1,6 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import {
-    connections,
-    activeId,
-    connectingId,
-    connect,
-    disconnect,
-    status,
-    isConnected,
-  } from '../stores/connections';
-  import { basePath, searchMode, exactLookup, refreshAll, setBasePath } from '../stores/keys';
+  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { useBrowser } from '../stores/keys';
   import { t, locale, setLocale, locales } from '../lib/i18n';
 
   export let searchEl: HTMLInputElement | null = null;
@@ -22,14 +13,10 @@
 
   const dispatch = createEventDispatcher<{ newkey: void; protos: void; script: void }>();
 
+  const { status, basePath, searchMode, exactLookup, refreshAll, setBasePath } = useBrowser();
   let search = $basePath;
   let baseTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function onConnectionChange(e: Event): void {
-    const id = (e.currentTarget as HTMLSelectElement).value;
-    if (!id || $activeId === id) return;
-    void connect(id);
-  }
+  onDestroy(() => { if (baseTimer) clearTimeout(baseTimer); });
 
   function onModeChange(e: Event): void {
     searchMode.set((e.currentTarget as HTMLSelectElement).value as 'prefix' | 'exact');
@@ -53,11 +40,11 @@
   }
 
   function onRefresh(): void {
-    if (isConnected()) void refreshAll();
+    if ($status.session) void refreshAll();
   }
 
   function onNewKey(): void {
-    if (isConnected()) dispatch('newkey');
+    if ($status.session) dispatch('newkey');
   }
 
   function onLocaleChange(e: Event): void {
@@ -66,23 +53,6 @@
 </script>
 
 <div class="toolbar">
-  <div class="conn">
-    <span class="dot {$status.state}" title={$status.message || $status.state} />
-    <select value={$activeId ?? ''} on:change={onConnectionChange} title={$t('tip.connection')}>
-      {#if !$activeId}
-        <option value="" disabled>{$t('toolbar.noConnection')}</option>
-      {/if}
-      {#each $connections as c (c.id)}
-        <option value={c.id}>
-          {c.name}{$connectingId === c.id ? $t('toolbar.connectingSuffix') : $activeId === c.id ? $t('toolbar.checkmark') : ''}
-        </option>
-      {/each}
-    </select>
-    {#if $activeId}
-      <button class="btn btn-small" on:click={disconnect} title={$t('tip.disconnect')}>{$t('toolbar.disconnect')}</button>
-    {/if}
-  </div>
-
   <div class="search">
     <select class="mode" value={$searchMode} on:change={onModeChange} title={$t('tip.searchMode')}>
       <option value="prefix">{$t('search.prefix')}</option>
@@ -138,38 +108,6 @@
     padding: 0 10px;
     border-bottom: 1px solid var(--border);
     background: var(--panel-alt);
-  }
-  .conn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: none;
-    min-width: 0;
-  }
-  .conn select {
-    max-width: 180px;
-  }
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex: none;
-    background: var(--dim);
-  }
-  .dot.connected {
-    background: var(--ok);
-  }
-  .dot.connecting {
-    background: var(--warning);
-    animation: pulse 1s ease-in-out infinite;
-  }
-  .dot.error {
-    background: var(--danger);
-  }
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
-    }
   }
   .search {
     display: flex;

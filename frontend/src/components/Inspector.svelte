@@ -1,24 +1,7 @@
 <script lang="ts">
-  import {
-    selectedKey,
-    detail,
-    detailLoading,
-    saveSignal,
-    reloadDetail,
-    updateDetail,
-    clearSelection,
-    refreshCurrent,
-  } from '../stores/keys';
-  import { status } from '../stores/connections';
+  import { useBrowser } from '../stores/keys';
   import { importedProtos } from '../stores/protos';
-  import {
-    scriptInfo,
-    scriptOutput,
-    scriptRunning,
-    scriptError,
-    runScriptOver,
-    resetScriptOutput,
-  } from '../stores/script';
+  import { scriptInfo, createScriptRun } from '../stores/script';
   import { api, localizeError } from '../lib/api';
   import { askConfirm } from '../lib/confirm';
   import { toast } from '../lib/toast';
@@ -36,6 +19,10 @@
     prettyJSON,
     formatBytes,
   } from '../lib/base64';
+
+  const { status, selectedKey, detail, detailLoading, saveSignal, reloadDetail, updateDetail,
+    clearSelection, refreshCurrent } = useBrowser();
+  const { scriptOutput, scriptRunning, scriptError, runScriptOver, resetScriptOutput } = createScriptRun();
 
   type ViewMode = 'text' | 'hex' | 'base64' | 'proto' | 'script';
 
@@ -73,9 +60,11 @@
     protoResult = null;
     protoSelected = 0;
     resetScriptOutput();
+    ++protoGen;
     void autoMatch($detail.valueBase64, $detail.sizeBytes, protoCount);
     if (scriptActive) void runScriptOver($detail.valueBase64);
   } else {
+    ++protoGen;
     originalBytes = new Uint8Array(0);
     text = '';
     protoResult = null;

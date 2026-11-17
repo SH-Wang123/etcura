@@ -2,13 +2,13 @@
   import { createEventDispatcher } from 'svelte';
   import {
     connections,
-    activeId,
-    connectingId,
+    activeSession,
+    sessions,
+    connecting,
     connect,
     disconnect,
     loadConnections,
     refreshStatus,
-    status,
   } from '../stores/connections';
   import { askConfirm } from '../lib/confirm';
   import { api, localizeError } from '../lib/api';
@@ -16,7 +16,12 @@
   import { t, tr } from '../lib/i18n';
   import type { ConnectionSummary } from '../lib/types';
 
-  const dispatch = createEventDispatcher<{ edit: string; add: void }>();
+  const dispatch = createEventDispatcher<{ edit: string; add: void; open: void }>();
+
+  function openConnection(id: string): void {
+    dispatch('open');
+    void connect(id);
+  }
 
   async function onDelete(c: ConnectionSummary): Promise<void> {
     const ok = await askConfirm({
@@ -41,9 +46,6 @@
     }
   }
 
-  function isActive(c: ConnectionSummary): boolean {
-    return $activeId === c.id && $status.state !== 'disconnected';
-  }
 </script>
 
 <div class="sidebar">
@@ -60,14 +62,15 @@
   {:else}
     <div class="list">
       {#each $connections as c (c.id)}
-        <div class="item" class:active={isActive(c)}>
-          <div class="item-main" role="button" tabindex="0" on:click={() => void connect(c.id)} on:keydown={(e) => e.key === 'Enter' && void connect(c.id)}>
+        {@const open = $sessions.find((item) => item.profileId === c.id)}
+        <div class="item" class:active={!!open && $activeSession === open.session}>
+          <div class="item-main" role="button" tabindex="0" on:click={() => openConnection(c.id)} on:keydown={(e) => e.key === 'Enter' && openConnection(c.id)}>
             <div class="name-row">
               <span class="name">{c.name}</span>
-              {#if $connectingId === c.id}
+              {#if $connecting.includes(c.id)}
                 <span class="spinner" />
-              {:else if isActive(c)}
-                <span class="dot" title={$status.state} />
+              {:else if open}
+                <span class="dot" title={$t('status.connected')} />
               {/if}
             </div>
             <div class="endpoints" title={c.endpoints.join(', ')}>
@@ -75,11 +78,11 @@
             </div>
           </div>
           <div class="item-actions">
-            {#if $activeId === c.id}
-              <button class="btn btn-tiny" on:click={() => void disconnect()}>{$t('sidebar.disconnect')}</button>
+            {#if open}
+              <button class="btn btn-tiny" on:click={() => void disconnect(open.session)}>{$t('sidebar.disconnect')}</button>
             {:else}
-              <button class="btn btn-tiny" on:click={() => void connect(c.id)}>
-                {$connectingId === c.id ? '…' : $t('sidebar.connect')}
+              <button class="btn btn-tiny" on:click={() => openConnection(c.id)}>
+                {$connecting.includes(c.id) ? '…' : $t('sidebar.connect')}
               </button>
             {/if}
             <button class="btn btn-tiny" title={$t('sidebar.edit')} on:click={() => dispatch('edit', c.id)}>

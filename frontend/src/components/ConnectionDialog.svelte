@@ -158,6 +158,10 @@
           <span>{$t('conn.readOnly')}</span>
         </label>
 
+        <label class="field span2">
+          <span>{$t('work.environment')}</span>
+          <input bind:value={form.environment} placeholder={$t('work.environmentHint')} />
+        </label>
         <div class="tls-section span2">
           <label class="check">
             <input type="checkbox" bind:checked={form.tls.enabled} />

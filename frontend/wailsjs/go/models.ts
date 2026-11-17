@@ -1,5 +1,146 @@
 export namespace model {
 	
+	export class RecordValue {
+	    base64: string;
+	    utf8: boolean;
+	    bytes: number;
+	    truncated: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new RecordValue(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.base64 = source["base64"];
+	        this.utf8 = source["utf8"];
+	        this.bytes = source["bytes"];
+	        this.truncated = source["truncated"];
+	    }
+	}
+	export class CompareRow {
+	    key: string;
+	    label: string;
+	    state: string;
+	    sourceLease: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new CompareRow(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.state = source["state"];
+	        this.sourceLease = source["sourceLease"];
+	    }
+	}
+	export class CompareDetail {
+	    row: CompareRow;
+	    source?: RecordValue;
+	    target?: RecordValue;
+
+	    static createFrom(source: any = {}) {
+	        return new CompareDetail(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = this.convertValues(source["row"], CompareRow);
+	        this.source = this.convertValues(source["source"], RecordValue);
+	        this.target = this.convertValues(source["target"], RecordValue);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CompareInfo {
+	    id: string;
+	    sourceRevision: string;
+	    targetRevision: string;
+	    targetReadOnly: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new CompareInfo(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sourceRevision = source["sourceRevision"];
+	        this.targetRevision = source["targetRevision"];
+	        this.targetReadOnly = source["targetReadOnly"];
+	    }
+	}
+	export class ComparePage {
+	    rows: CompareRow[];
+	    nextCursor: string;
+	    scanned: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ComparePage(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rows = this.convertValues(source["rows"], CompareRow);
+	        this.nextCursor = source["nextCursor"];
+	        this.scanned = source["scanned"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CompareRequest {
+	    sourceSession: string;
+	    targetSession: string;
+	    sourcePrefix: string;
+	    targetPrefix: string;
+
+	    static createFrom(source: any = {}) {
+	        return new CompareRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceSession = source["sourceSession"];
+	        this.targetSession = source["targetSession"];
+	        this.sourcePrefix = source["sourcePrefix"];
+	        this.targetPrefix = source["targetPrefix"];
+	    }
+	}
+
 	export class TLSConfig {
 	    enabled: boolean;
 	    caFile?: string;
@@ -23,6 +164,7 @@ export namespace model {
 	export class ConnectionConfig {
 	    id: string;
 	    name: string;
+	    environment?: string;
 	    endpoints: string[];
 	    username?: string;
 	    dialTimeoutMs: number;
@@ -38,6 +180,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.environment = source["environment"];
 	        this.endpoints = source["endpoints"];
 	        this.username = source["username"];
 	        this.dialTimeoutMs = source["dialTimeoutMs"];
@@ -304,6 +447,7 @@ export namespace model {
 		    return a;
 		}
 	}
+
 	export class ScriptConfig {
 	    language: string;
 	    inputVar: string;
@@ -372,6 +516,7 @@ export namespace model {
 	    session: string;
 	    readOnly: boolean;
 	    name: string;
+	    environment: string;
 	    endpoints: string;
 	    header: number;
 	    etcdVersion: string;
@@ -388,6 +533,7 @@ export namespace model {
 	        this.session = source["session"];
 	        this.readOnly = source["readOnly"];
 	        this.name = source["name"];
+	        this.environment = source["environment"];
 	        this.endpoints = source["endpoints"];
 	        this.header = source["header"];
 	        this.etcdVersion = source["etcdVersion"];
@@ -410,6 +556,152 @@ export namespace model {
 	        this.header = source["header"];
 	        this.etcdVersion = source["etcdVersion"];
 	        this.endpoint = source["endpoint"];
+	    }
+	}
+	export class SyncPlan {
+	    id: string;
+	    rows: CompareRow[];
+
+	    static createFrom(source: any = {}) {
+	        return new SyncPlan(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.rows = this.convertValues(source["rows"], CompareRow);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SyncResult {
+	    key: string;
+	    label: string;
+	    state: string;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SyncResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.state = source["state"];
+	        this.message = source["message"];
+	    }
+	}
+
+	export class WatchEvent {
+	    type: string;
+	    key: string;
+	    revision: string;
+	    seenAt: number;
+	    before?: RecordValue;
+	    after?: RecordValue;
+
+	    static createFrom(source: any = {}) {
+	        return new WatchEvent(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.key = source["key"];
+	        this.revision = source["revision"];
+	        this.seenAt = source["seenAt"];
+	        this.before = this.convertValues(source["before"], RecordValue);
+	        this.after = this.convertValues(source["after"], RecordValue);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class WatchBatch {
+	    events: WatchEvent[];
+	    state: string;
+	    revision: string;
+	    missed: number;
+	    error: string;
+
+	    static createFrom(source: any = {}) {
+	        return new WatchBatch(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.events = this.convertValues(source["events"], WatchEvent);
+	        this.state = source["state"];
+	        this.revision = source["revision"];
+	        this.missed = source["missed"];
+	        this.error = source["error"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+	export class WatchStart {
+	    session: string;
+	    key: string;
+	    prefix: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new WatchStart(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.session = source["session"];
+	        this.key = source["key"];
+	        this.prefix = source["prefix"];
 	    }
 	}
 

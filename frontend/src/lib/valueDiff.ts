@@ -12,6 +12,9 @@ export function jsonFields(text: string): string[] | null {
           return;
         }
       }
+      if (typeof value === 'number' && (!Number.isFinite(value) || Number.isInteger(value) && !Number.isSafeInteger(value))) {
+        throw new RangeError('Numeric field requires raw view');
+      }
       fields.push(`${path || '/'} = ${JSON.stringify(value)}`);
     }
     visit(parsed, '');

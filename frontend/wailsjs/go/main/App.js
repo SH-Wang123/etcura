@@ -10,6 +10,10 @@ export function CancelCompare(arg1) {
   return window['go']['main']['App']['CancelCompare'](arg1);
 }
 
+export function CancelSync(arg1) {
+  return window['go']['main']['App']['CancelSync'](arg1);
+}
+
 export function ClearProtos() {
   return window['go']['main']['App']['ClearProtos']();
 }

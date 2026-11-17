@@ -21,7 +21,7 @@ import (
 const (
 	pageRows     = 80
 	pageScan     = 600
-	scanBatch    = 8
+	scanBatch    = 16
 	maxSyncItems = 100
 	maxSyncBytes = 16 << 20
 )
@@ -362,6 +362,14 @@ func (e *Engine) PreviewSync(id string, keys []string) (model.SyncPlan, error) {
 	plan.id = e.nextID()
 	e.plan = plan
 	return model.SyncPlan{ID: plan.id, Rows: rows}, nil
+}
+
+func (e *Engine) CancelSync(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.plan != nil && e.plan.id == id {
+		e.plan = nil
+	}
 }
 
 func (e *Engine) ApplySync(id string, permanent []string) ([]model.SyncResult, error) {

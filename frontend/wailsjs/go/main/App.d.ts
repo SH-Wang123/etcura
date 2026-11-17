@@ -6,6 +6,8 @@ export function ApplySync(arg1:string,arg2:Array<string>):Promise<Array<model.Sy
 
 export function CancelCompare(arg1:string):Promise<void>;
 
+export function CancelSync(arg1:string):Promise<void>;
+
 export function ClearProtos():Promise<void>;
 
 export function ClearScript():Promise<void>;

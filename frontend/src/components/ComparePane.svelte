@@ -93,14 +93,23 @@
     busy = true;
     error = '';
     try {
-      const response = await workbench.comparePage(comparison.id, next, filter);
-      if (run !== generation) return false;
-      cursor = next;
-      rows = response.rows;
-      more = response.nextCursor;
-      scanned = response.scanned;
-      complete = true;
-      return true;
+      let continuation = next;
+      scanned = 0;
+      while (run === generation) {
+        const response = await workbench.comparePage(comparison.id, continuation, filter);
+        if (run !== generation) return false;
+        scanned += response.scanned;
+        if (!response.rows.length && response.nextCursor) {
+          continuation = response.nextCursor;
+          continue;
+        }
+        cursor = next;
+        rows = response.rows;
+        more = response.nextCursor;
+        complete = true;
+        return true;
+      }
+      return false;
     } catch (failure) {
       if (run === generation) error = localizeError(failure).message;
       return false;
@@ -167,6 +176,13 @@
     } finally {
       if (info?.id === id) busy = false;
     }
+  }
+
+  function cancelPreview(): void {
+    if (!plan || applying) return;
+    const id = plan.id;
+    plan = null;
+    void workbench.cancelSync(id).catch((failure) => { error = localizeError(failure).message; });
   }
 
   async function apply(): Promise<void> {
@@ -267,15 +283,23 @@
       <ul>
         {#each plan.rows as row (row.key)}
           <li>
-            <code>{row.label || $t('work.prefixKey')}</code> · {$t(row.state === 'source' ? 'work.create' : 'work.update')}
+            <button type="button" class="btn btn-small mono" disabled={applying} on:click={() => void openRow(row.key)}>
+              {row.label || $t('work.prefixKey')}
+            </button>
+            · {$t(row.state === 'source' ? 'work.create' : 'work.update')}
             {#if row.sourceLease}
               <label><input type="checkbox" checked={permanent.has(row.key)} disabled={applying} on:change={() => (permanent = toggle(row.key, permanent))} /> {$t('work.permanent')}</label>
+            {/if}
+            {#if detail?.row.key === row.key}
+              <div class="preview-diff">
+                <ValueDiff left={detail.source} right={detail.target} {leftLabel} {rightLabel} />
+              </div>
             {/if}
           </li>
         {/each}
       </ul>
       <footer>
-        <button class="btn" disabled={applying} on:click={() => (plan = null)}>{$t('confirm.cancel')}</button>
+        <button class="btn" disabled={applying} on:click={cancelPreview}>{$t('confirm.cancel')}</button>
         <button class="btn primary" disabled={applying} on:click={() => void apply()}>{applying ? $t('work.applying') : $t('work.apply')}</button>
       </footer>
     </div>
@@ -314,6 +338,7 @@
   .preview { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: min(600px,90vw); padding: 16px; }
   .preview ul { max-height: 45vh; overflow: auto; padding-left: 20px; }
   .preview li { margin: 9px 0; }
+  .preview-diff { margin-top: 8px; max-height: 200px; overflow: auto; }
   .preview label { display: flex; align-items: center; }
   .preview footer { display: flex; justify-content: flex-end; gap: 7px; }
 </style>

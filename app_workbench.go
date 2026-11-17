@@ -20,6 +20,8 @@ func (a *App) PreviewSync(id string, keys []string) (model.SyncPlan, error) {
 	return a.workbench.PreviewSync(id, keys)
 }
 
+func (a *App) CancelSync(id string) { a.workbench.CancelSync(id) }
+
 func (a *App) ApplySync(id string, permanentKeys []string) ([]model.SyncResult, error) {
 	return a.workbench.ApplySync(id, permanentKeys)
 }

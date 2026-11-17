@@ -1,6 +1,6 @@
 import {
   StartCompare, CancelCompare, ComparePage, CompareDetail,
-  PreviewSync, ApplySync, StartWatch, PollWatch, StopWatch,
+  PreviewSync, CancelSync, ApplySync, StartWatch, PollWatch, StopWatch,
 } from '../../wailsjs/go/main/App';
 
 export const workbench = {
@@ -9,6 +9,7 @@ export const workbench = {
   comparePage: ComparePage,
   compareDetail: CompareDetail,
   previewSync: PreviewSync,
+  cancelSync: CancelSync,
   applySync: ApplySync,
   startWatch: StartWatch,
   pollWatch: PollWatch,

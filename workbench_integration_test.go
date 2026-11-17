@@ -130,6 +130,14 @@ func TestIntegrationWorkbench(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.CancelSync(plan.ID)
+	if _, err := app.ApplySync(plan.ID, nil); err == nil {
+		t.Fatal("cancelled preview still writable")
+	}
+	plan, err = app.PreviewSync(info.ID, []string{binaryKey, encode("change"), encode("conflict"), encode("lease")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	put(target, targetPrefix+"conflict", "other writer")
 	results, err := app.ApplySync(plan.ID, nil)
 	if err != nil {
@@ -173,6 +181,25 @@ func TestIntegrationWorkbench(t *testing.T) {
 	if err != nil || view.Row.State != "same" {
 		t.Fatalf("recompare binary: %+v, %v", view, err)
 	}
+	plan, err = app.PreviewSync(info.ID, []string{encode("lease")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err = app.ApplySync(plan.ID, []string{encode("lease")})
+	if err != nil || len(results) != 1 || results[0].State != "success" {
+		t.Fatalf("explicit lease conversion: %+v, %v", results, err)
+	}
+	created, err := target.Get(ctx, targetPrefix+"lease")
+	if err != nil || len(created.Kvs) != 1 || created.Kvs[0].Lease != 0 {
+		t.Fatalf("permanent key: %v, %v", created, err)
+	}
+	if _, err := target.Delete(ctx, targetPrefix+"lease"); err != nil {
+		t.Fatal(err)
+	}
+	waitWatch(t, app, watch, func(event model.WatchEvent) bool {
+		return event.Key == targetPrefix+"lease" && event.Type == "delete" && event.After == nil &&
+			event.Before != nil && event.Before.Base64 == encode("temporary")
+	})
 	app.CancelCompare(info.ID)
 	if _, err = app.ComparePage(info.ID, "", "all"); err == nil {
 		t.Fatal("cancelled comparison still readable")

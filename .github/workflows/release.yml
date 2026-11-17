@@ -33,13 +33,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: darwin/arm64
             artifact: etcura-darwin-arm64
-          - os: macos-14
+          - os: macos-15-intel
             platform: darwin/amd64
             artifact: etcura-darwin-amd64
-          - os: macos-14
+          - os: macos-15
             platform: darwin/universal
             artifact: etcura-darwin-universal
           - os: windows-latest

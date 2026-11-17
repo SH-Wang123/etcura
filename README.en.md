@@ -16,10 +16,8 @@ Go · Wails v2 · Svelte · TypeScript · one codebase, native desktop apps on e
 stable, lightweight, fast-launching **cross-platform** GUI for etcd
 (macOS / Windows / Linux) built for daily use: connection management, tree browsing,
 viewing / creating / editing (CAS-protected) / deleting keys, and automatic Protobuf value
-decoding. Go handles all etcd communication; the frontend only talks to Wails bindings. It is
-built for large clusters — **smooth at up to million-key scale** — with cursor pagination and
-server-side filtering everywhere and a memory footprint that does not grow with key count; it
-never loads the whole database.
+decoding. Go handles all etcd communication; the frontend only talks to Wails bindings. Directory
+rows load on demand using cursor pagination.
 
 <div align="center">
   <img src="docs/screenshot.png" alt="Etcura screenshot" width="960" />
@@ -164,7 +162,7 @@ go run ./scripts/seed -endpoints 127.0.0.1:12379 -count 100000
 go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rounds 3
 ```
 
-The benchmark drives the exact pagination code path used by the app. Reference result
+This benchmark measures Go heap use for flat pagination. Reference result
 (Apple Silicon, local etcd, 100k keys, 3 rounds × 100 pages × 200 rows): ~0.3s per round,
 Go heap steady at ~1.1 MB — no growth with browsing volume.
 

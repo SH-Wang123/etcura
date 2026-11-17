@@ -87,7 +87,9 @@ func PutWithCAS(ctx context.Context, client *clientv3.Client, key string, value 
 	}
 
 	put := clientv3.OpPut(key, string(value))
-	if leaseID != 0 {
+	if expectedModRevision > 0 && leaseID == 0 {
+		put = clientv3.OpPut(key, string(value), clientv3.WithIgnoreLease())
+	} else if leaseID != 0 {
 		put = clientv3.OpPut(key, string(value), clientv3.WithLease(clientv3.LeaseID(leaseID)))
 	}
 
@@ -96,7 +98,7 @@ func PutWithCAS(ctx context.Context, client *clientv3.Client, key string, value 
 
 	txn, err := client.Txn(cctx).
 		If(clientv3.Compare(clientv3.ModRevision(key), "=", expectedModRevision)).
-		Then(put).
+		Then(put, clientv3.OpGet(key)).
 		Else(clientv3.OpGet(key)).
 		Commit()
 	if err != nil {
@@ -127,25 +129,30 @@ func PutWithCAS(ctx context.Context, client *clientv3.Client, key string, value 
 		return model.KvDetail{}, model.NewError(model.CodeKeyNotFound, "Key no longer exists: %s", key)
 	}
 
-	return GetKey(cctx, client, key)
+	return DetailFromKV(txn.Responses[1].GetResponseRange().Kvs[0]), nil
 }
 
-// DeleteKey removes exactly one key. There is deliberately no prefix variant:
-// mass deletion is out of scope and dangerous.
-func DeleteKey(ctx context.Context, client *clientv3.Client, key string) error {
-	if key == "" {
-		return model.NewInvalidArgument("key must not be empty")
+// DeleteKey deletes only the revision the caller has confirmed.
+func DeleteKey(ctx context.Context, client *clientv3.Client, key string, expectedModRevision int64) error {
+	if key == "" || expectedModRevision <= 0 {
+		return model.NewInvalidArgument("key and a positive revision are required")
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, requestTimeoutFrom(ctx))
 	defer cancel()
-
-	resp, err := client.Delete(cctx, key)
+	resp, err := client.Txn(cctx).
+		If(clientv3.Compare(clientv3.ModRevision(key), "=", expectedModRevision)).
+		Then(clientv3.OpDelete(key)).
+		Else(clientv3.OpGet(key, clientv3.WithKeysOnly())).
+		Commit()
 	if err != nil {
 		return MapError(err)
 	}
-	if resp.Deleted == 0 {
-		return model.NewError(model.CodeKeyNotFound, "Key not found: %s", key)
+	if !resp.Succeeded {
+		if resp.Responses[0].GetResponseRange().Count == 0 {
+			return model.NewError(model.CodeKeyNotFound, "Key not found: %s", key)
+		}
+		return model.NewError(model.CodeRevisionConflict, "The key has changed since it was loaded")
 	}
 	return nil
 }

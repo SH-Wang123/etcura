@@ -27,6 +27,7 @@ export namespace model {
 	    username?: string;
 	    dialTimeoutMs: number;
 	    requestTimeoutMs: number;
+	    readOnly: boolean;
 	    tls: TLSConfig;
 	
 	    static createFrom(source: any = {}) {
@@ -41,6 +42,7 @@ export namespace model {
 	        this.username = source["username"];
 	        this.dialTimeoutMs = source["dialTimeoutMs"];
 	        this.requestTimeoutMs = source["requestTimeoutMs"];
+	        this.readOnly = source["readOnly"];
 	        this.tls = this.convertValues(source["tls"], TLSConfig);
 	    }
 	
@@ -366,6 +368,9 @@ export namespace model {
 	}
 	export class StatusInfo {
 	    state: string;
+	    profileId: string;
+	    session: string;
+	    readOnly: boolean;
 	    name: string;
 	    endpoints: string;
 	    header: number;
@@ -379,6 +384,9 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.state = source["state"];
+	        this.profileId = source["profileId"];
+	        this.session = source["session"];
+	        this.readOnly = source["readOnly"];
 	        this.name = source["name"];
 	        this.endpoints = source["endpoints"];
 	        this.header = source["header"];

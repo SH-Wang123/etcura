@@ -46,27 +46,45 @@ func NewClient(ctx context.Context, cfg *model.ConnectionConfig, password string
 	return client, nil
 }
 
-// ProbeStatus performs a genuine etcd Status RPC against the first endpoint.
-// This is what makes "Test Connection" meaningful: clientv3.New succeeding
-// proves nothing on its own.
+// ProbeStatus returns the first successful Status response. Concurrent probes
+// let a healthy configured endpoint answer even if an earlier one is down.
 func ProbeStatus(ctx context.Context, client *clientv3.Client, timeout time.Duration) (*model.StatusResponse, error) {
 	if timeout <= 0 {
 		timeout = model.DefaultRequestTimeout
 	}
-	cctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	endpoint := client.Endpoints()[0]
-	resp, err := client.Status(cctx, endpoint)
-	if err != nil {
-		return nil, MapError(err)
+	type result struct {
+		status *model.StatusResponse
+		err    error
 	}
-	return &model.StatusResponse{
-		Ok:          true,
-		Header:      resp.Header.Revision,
-		EtcdVersion: resp.Version,
-		Endpoint:    endpoint,
-	}, nil
+	endpoints := client.Endpoints()
+	if len(endpoints) == 0 {
+		return nil, model.NewInvalidArgument("at least one endpoint is required")
+	}
+	results := make(chan result, len(endpoints))
+	for _, endpoint := range endpoints {
+		go func() {
+			resp, err := client.Status(ctx, endpoint)
+			if err != nil {
+				results <- result{err: err}
+				return
+			}
+			results <- result{status: &model.StatusResponse{
+				Ok: true, Header: resp.Header.Revision, EtcdVersion: resp.Version, Endpoint: endpoint,
+			}}
+		}()
+	}
+	var lastErr error
+	for range endpoints {
+		probe := <-results
+		if probe.err == nil {
+			return probe.status, nil
+		}
+		lastErr = probe.err
+	}
+	return nil, MapError(lastErr)
 }
 
 // LoadTLSConfig materialises the configured certificate files into a

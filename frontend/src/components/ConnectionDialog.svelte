@@ -153,6 +153,11 @@
           <input type="number" min="500" step="500" bind:value={form.requestTimeoutMs} />
         </label>
 
+        <label class="check span2">
+          <input type="checkbox" bind:checked={form.readOnly} />
+          <span>{$t('conn.readOnly')}</span>
+        </label>
+
         <div class="tls-section span2">
           <label class="check">
             <input type="checkbox" bind:checked={form.tls.enabled} />

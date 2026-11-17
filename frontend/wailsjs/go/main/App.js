@@ -14,16 +14,16 @@ export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
 
-export function CreateKey(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateKey'](arg1, arg2, arg3);
+export function CreateKey(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateKey'](arg1, arg2, arg3, arg4);
 }
 
 export function DeleteConnection(arg1) {
   return window['go']['main']['App']['DeleteConnection'](arg1);
 }
 
-export function DeleteKey(arg1) {
-  return window['go']['main']['App']['DeleteKey'](arg1);
+export function DeleteKey(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteKey'](arg1, arg2, arg3);
 }
 
 export function Disconnect() {
@@ -34,8 +34,8 @@ export function GetConnection(arg1) {
   return window['go']['main']['App']['GetConnection'](arg1);
 }
 
-export function GetKey(arg1) {
-  return window['go']['main']['App']['GetKey'](arg1);
+export function GetKey(arg1, arg2) {
+  return window['go']['main']['App']['GetKey'](arg1, arg2);
 }
 
 export function GetScript() {
@@ -54,12 +54,12 @@ export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
 }
 
-export function ListKeys(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListKeys'](arg1, arg2, arg3);
+export function ListKeys(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListKeys'](arg1, arg2, arg3, arg4);
 }
 
-export function ListLevel(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListLevel'](arg1, arg2, arg3);
+export function ListLevel(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListLevel'](arg1, arg2, arg3, arg4);
 }
 
 export function ListProtos() {
@@ -78,8 +78,8 @@ export function SaveConnection(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveConnection'](arg1, arg2, arg3);
 }
 
-export function SaveKey(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SaveKey'](arg1, arg2, arg3);
+export function SaveKey(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SaveKey'](arg1, arg2, arg3, arg4);
 }
 
 export function SetScript(arg1) {

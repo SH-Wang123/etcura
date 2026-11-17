@@ -41,6 +41,7 @@ export interface ConnectionConfig {
   username: string;
   dialTimeoutMs: number;
   requestTimeoutMs: number;
+  readOnly: boolean;
   tls: TLSConfig;
 }
 
@@ -53,6 +54,9 @@ export interface ConnectionSummary {
 
 export interface StatusInfo {
   state: ConnectionState;
+  profileId: string;
+  session: string;
+  readOnly: boolean;
   name: string;
   endpoints: string;
   header: number;
@@ -167,6 +171,7 @@ export function newConnectionForm(): ConnectionConfig {
     username: '',
     dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    readOnly: false,
     tls: emptyTLS(),
   };
 }

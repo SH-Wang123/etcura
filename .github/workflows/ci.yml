@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Frontend and etcd integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build and check frontend
+        run: |
+          npm --prefix frontend ci
+          npm --prefix frontend run check
+          npm --prefix frontend run build
+
+      - name: Test and vet Go packages
+        run: |
+          go test -race ./...
+          go vet ./...
+
+      - name: Install pinned etcd
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/etcura-etcd"
+          cd "$RUNNER_TEMP/etcura-etcd"
+          archive=etcd-v3.5.21-linux-amd64.tar.gz
+          base=https://github.com/etcd-io/etcd/releases/download/v3.5.21
+          curl -fsSLO --retry 3 "$base/$archive"
+          curl -fsSLO --retry 3 "$base/SHA256SUMS"
+          awk -v name="$archive" '$2 == name || $2 == "*" name { print }' SHA256SUMS > etcd.sha256
+          sha256sum -c etcd.sha256
+          tar -xzf "$archive"
+
+      - name: Run integration suite
+        run: python3 scripts/test-integration.py "$RUNNER_TEMP/etcura-etcd/etcd-v3.5.21-linux-amd64/etcd"

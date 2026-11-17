@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,150 +12,159 @@ import (
 	"etcura/internal/model"
 )
 
-// Manager owns the single long-lived clientv3.Client for the app. Exactly one
-// connection is active at a time; switching profiles closes the old client
-// before dialing the new one, so clients never leak.
+// Manager owns the active client and invalidates its session on every switch.
 type Manager struct {
-	mu     sync.Mutex
-	client *clientv3.Client
-	cfg    *model.ConnectionConfig
-
-	state   string
-	message string
-	rev     int64
-	version string
+	mu           sync.Mutex
+	client       *clientv3.Client
+	cfg          *model.ConnectionConfig
+	probeCancel  context.CancelFunc
+	clientCancel context.CancelFunc
+	generation   uint64
+	state        string
+	message      string
+	rev          int64
+	version      string
 }
 
 func NewManager() *Manager {
 	return &Manager{state: model.StateDisconnected}
 }
 
-// Connect closes any previous client, dials the new profile and verifies it
-// with a real Status RPC before flipping the state to Connected.
-func (m *Manager) Connect(ctx context.Context, cfg *model.ConnectionConfig, password string) (*model.StatusResponse, error) {
-	if err := cfg.Normalize(); err != nil {
-		return nil, err
+func (m *Manager) Connect(ctx context.Context, cfg *model.ConnectionConfig, password string) (model.StatusInfo, error) {
+	profile := *cfg
+	if err := profile.Normalize(); err != nil {
+		return model.StatusInfo{}, err
 	}
+	probeCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	m.mu.Lock()
-	m.state = model.StateConnecting
-	m.message = ""
+	m.resetLocked(model.StateConnecting)
+	generation := m.generation
+	m.probeCancel = cancel
+	m.cfg = &profile
 	m.mu.Unlock()
 
-	// Old client first: no half-open duplicate connections.
-	m.closeLocked()
-
-	client, err := NewClient(ctx, cfg, password)
-	if err != nil {
-		m.setError(err)
-		return nil, err
-	}
-
-	probe, err := ProbeStatus(ctx, client, time.Duration(cfg.RequestTimeoutMs)*time.Millisecond)
-	if err != nil {
-		_ = client.Close()
-		m.setError(err)
-		return nil, err
+	// The dial and status probe are bounded separately from the client's
+	// lifetime. Close releases the client on switch, disconnect or shutdown.
+	clientCtx, clientCancel := context.WithCancel(context.WithoutCancel(ctx))
+	stopAbort := context.AfterFunc(probeCtx, clientCancel)
+	client, err := NewClient(clientCtx, &profile, password)
+	var probe *model.StatusResponse
+	if err == nil {
+		probe, err = ProbeStatus(probeCtx, client, time.Duration(profile.RequestTimeoutMs)*time.Millisecond)
 	}
 
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	stopped := stopAbort()
+	if generation != m.generation {
+		clientCancel()
+		if client != nil {
+			_ = client.Close()
+		}
+		return model.StatusInfo{}, model.NewError(model.CodeConnectionChanged, "The connection changed")
+	}
+	m.probeCancel = nil
+	if err == nil && (!stopped || probeCtx.Err() != nil) {
+		err = MapError(probeCtx.Err())
+	}
+	if err != nil {
+		clientCancel()
+		if client != nil {
+			_ = client.Close()
+		}
+		m.cfg = nil
+		m.state = model.StateError
+		m.message = err.Error()
+		return m.statusLocked(), err
+	}
+
 	m.client = client
-	m.cfg = cfg
+	m.clientCancel = clientCancel
 	m.state = model.StateConnected
 	m.rev = probe.Header
 	m.version = probe.EtcdVersion
-	m.message = ""
-	m.mu.Unlock()
-
-	return probe, nil
+	return m.statusLocked(), nil
 }
 
-// Disconnect closes the active client, if any.
-func (m *Manager) Disconnect() error {
+func (m *Manager) Disconnect() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.closeLocked()
-	m.state = model.StateDisconnected
-	m.message = ""
-	m.rev = 0
-	m.version = ""
-	return nil
+	m.resetLocked(model.StateDisconnected)
 }
 
-// Client returns the active client or NOT_CONNECTED. Callers use it for RPCs
-// with their own timeout context and never Close it themselves.
-func (m *Manager) Client() (*clientv3.Client, error) {
+func (m *Manager) DisconnectProfile(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.client == nil {
-		return nil, model.NewError(model.CodeNotConnected, "Not connected to an etcd server")
+	if m.cfg != nil && m.cfg.ID == id {
+		m.resetLocked(model.StateDisconnected)
 	}
-	return m.client, nil
 }
 
-// RequestTimeout is the request timeout of the active profile.
-func (m *Manager) RequestTimeout() time.Duration {
+// Client validates the session and returns a client and timeout from the same
+// profile. An in-flight caller can only use the client it originally acquired.
+func (m *Manager) Client(session string, write bool) (*clientv3.Client, time.Duration, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.cfg == nil {
-		return model.DefaultRequestTimeout
+	if m.client == nil || session == "" || session != m.sessionLocked() {
+		return nil, 0, model.NewError(model.CodeConnectionChanged, "The connection changed")
 	}
-	return time.Duration(m.cfg.RequestTimeoutMs) * time.Millisecond
+	if write && m.cfg.ReadOnly {
+		return nil, 0, model.NewError(model.CodeReadOnly, "This connection is read-only")
+	}
+	return m.client, time.Duration(m.cfg.RequestTimeoutMs) * time.Millisecond, nil
 }
 
-// Profile returns a copy of the active connection config.
-func (m *Manager) Profile() (model.ConnectionConfig, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.cfg == nil {
-		return model.ConnectionConfig{}, false
-	}
-	return *m.cfg, true
-}
-
-// Status returns a snapshot for the status bar.
 func (m *Manager) Status() model.StatusInfo {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.statusLocked()
+}
+
+func (m *Manager) statusLocked() model.StatusInfo {
 	info := model.StatusInfo{State: m.state, Message: m.message}
-	if m.cfg != nil {
+	if m.client != nil {
+		info.ProfileID = m.cfg.ID
+		info.Session = m.sessionLocked()
+		info.ReadOnly = m.cfg.ReadOnly
 		info.Name = m.cfg.Name
 		info.Endpoints = strings.Join(m.cfg.Endpoints, ", ")
-	}
-	if m.state == model.StateConnected {
 		info.Header = m.rev
 		info.EtcdVersion = m.version
 	}
 	return info
 }
 
-// SetRevision updates the cached cluster revision after a successful read or
-// write so the status bar stays truthful.
-func (m *Manager) SetRevision(rev int64) {
-	m.mu.Lock()
-	m.rev = rev
-	m.mu.Unlock()
-}
-
-// Close shuts the manager down (application exit path).
-func (m *Manager) Close() {
+func (m *Manager) SetRevision(session string, rev int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.closeLocked()
-	m.state = model.StateDisconnected
+	if m.client != nil && session == m.sessionLocked() && rev > m.rev {
+		m.rev = rev
+	}
 }
 
-func (m *Manager) setError(err error) {
-	m.mu.Lock()
-	m.state = model.StateError
-	m.message = err.Error()
-	m.mu.Unlock()
+func (m *Manager) sessionLocked() string {
+	return strconv.FormatUint(m.generation, 10)
 }
 
-func (m *Manager) closeLocked() {
+func (m *Manager) resetLocked(state string) {
+	m.generation++
+	if m.probeCancel != nil {
+		m.probeCancel()
+		m.probeCancel = nil
+	}
 	if m.client != nil {
 		_ = m.client.Close()
 		m.client = nil
 	}
+	if m.clientCancel != nil {
+		m.clientCancel()
+		m.clientCancel = nil
+	}
 	m.cfg = nil
+	m.state = state
+	m.message = ""
+	m.rev = 0
+	m.version = ""
 }

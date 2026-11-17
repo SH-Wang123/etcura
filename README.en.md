@@ -16,10 +16,8 @@ Go · Wails v2 · Svelte · TypeScript · one codebase, native desktop apps on e
 stable, lightweight, fast-launching **cross-platform** GUI for etcd
 (macOS / Windows / Linux) built for daily use: connection management, tree browsing,
 viewing / creating / editing (CAS-protected) / deleting keys, and automatic Protobuf value
-decoding. Go handles all etcd communication; the frontend only talks to Wails bindings. It is
-built for large clusters — **smooth at up to million-key scale** — with cursor pagination and
-server-side filtering everywhere and a memory footprint that does not grow with key count; it
-never loads the whole database.
+decoding. Go handles all etcd communication; the frontend only talks to Wails bindings. Directory
+rows load on demand using cursor pagination.
 
 <div align="center">
   <img src="docs/screenshot.png" alt="Etcura screenshot" width="960" />
@@ -32,7 +30,7 @@ never loads the whole database.
   same codebase produces native desktop apps everywhere, distributed via
   [Releases](https://github.com/SH-Wang123/etcura/releases)
 - **Connection management**: multiple profiles (name / multiple endpoints / username / TLS /
-  timeouts); Test Connection performs a real `Status` RPC; passwords live in the OS keyring
+  timeouts / read-only); Test Connection performs a real `Status` RPC; passwords live in the OS keyring
   (macOS Keychain / Windows Credential Manager / Linux Secret Service) — the config file never
   stores plaintext secrets
 - **Tree browsing**: single indented tree, lazily expanded directories, click a leaf key to
@@ -56,9 +54,8 @@ never loads the whole database.
   / show stdout), and the bytes always arrive on stdin too. Binary values open in the script
   view automatically, and failures show the exit code plus the interpreter's stderr
 - **Safe writes**: creating checks existence first (overwrite requires confirmation); saving
-  uses `Txn + Compare(ModRevision)` CAS — on conflict you are asked to reload, never
-  silently overwritten; deletes are single-key only and always confirmed (server + full key
-  shown)
+  preserves the lease and uses `Txn + Compare(ModRevision)`. Overwrite and single-key delete
+  check the confirmed revision. Writes are scoped to the active connection session
 - **i18n**: Simplified Chinese / English UI, follows the system language, switchable anytime
   (error messages included)
 - **Shortcuts**: ⌘R refresh · ⌘N new key · ⌘S save · ⌘F search
@@ -165,7 +162,7 @@ go run ./scripts/seed -endpoints 127.0.0.1:12379 -count 100000
 go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rounds 3
 ```
 
-The benchmark drives the exact pagination code path used by the app. Reference result
+This benchmark measures Go heap use for flat pagination. Reference result
 (Apple Silicon, local etcd, 100k keys, 3 rounds × 100 pages × 200 rows): ~0.3s per round,
 Go heap steady at ~1.1 MB — no growth with browsing volume.
 
@@ -201,7 +198,7 @@ lacks it) — plus `etcura-windows-amd64.zip`.
 
 ```bash
 go test ./internal/...                                      # unit tests
-ETCD_ENDPOINTS=127.0.0.1:12379 go test -tags integration ./internal/etcd/ -v   # integration (needs local etcd)
+python3 scripts/test-integration.py "$(command -v etcd)"     # two disposable etcd servers
 npm --prefix frontend run check                             # svelte-check (strict TS)
 npm --prefix frontend run build                             # frontend build
 ```
@@ -220,8 +217,8 @@ npm --prefix frontend run build                             # frontend build
   interleaved with direct leaves); the cursor guarantees no duplicates or gaps across pages,
   with a hard per-page scan budget
 - One long-lived client per connection; switching closes the old client first
-- Every RPC runs under `context.WithTimeout`; starting a new query cancels the previous
-  in-flight one; the UI keeps generation counters against out-of-order responses
+- RPCs use request deadlines. The UI discards stale responses by connection session and
+  request generation
 - Shutdown: cancel outstanding requests → close the client → exit; no goroutine or context leaks
 
 ## Roadmap (Phase 2 candidates)

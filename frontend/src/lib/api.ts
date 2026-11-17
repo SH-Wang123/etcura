@@ -124,9 +124,9 @@ export const api = {
     bindings();
     return _getStatus() as Promise<StatusInfo>;
   },
-  listLevel(prefix: string, cursor: string, pageSize: number): Promise<LevelPage> {
+  listLevel(session: string, prefix: string, cursor: string, pageSize: number): Promise<LevelPage> {
     bindings();
-    return _listLevel(prefix, cursor, pageSize) as Promise<LevelPage>;
+    return _listLevel(session, prefix, cursor, pageSize) as Promise<LevelPage>;
   },
   importProtos(paths: string[]): Promise<ProtoFileInfo[]> {
     bindings();
@@ -160,20 +160,20 @@ export const api = {
     bindings();
     return _runScript(valueBase64) as Promise<ScriptOutput>;
   },
-  getKey(key: string): Promise<KvDetail> {
+  getKey(session: string, key: string): Promise<KvDetail> {
     bindings();
-    return _getKey(key) as Promise<KvDetail>;
+    return _getKey(session, key) as Promise<KvDetail>;
   },
-  createKey(key: string, valueBase64: string, leaseID: string): Promise<KvDetail> {
+  createKey(session: string, key: string, valueBase64: string, leaseID: string): Promise<KvDetail> {
     bindings();
-    return _createKey(key, valueBase64, leaseID) as Promise<KvDetail>;
+    return _createKey(session, key, valueBase64, leaseID) as Promise<KvDetail>;
   },
-  saveKey(key: string, valueBase64: string, expectedModRevision: number): Promise<KvDetail> {
+  saveKey(session: string, key: string, valueBase64: string, expectedModRevision: number): Promise<KvDetail> {
     bindings();
-    return _saveKey(key, valueBase64, expectedModRevision) as Promise<KvDetail>;
+    return _saveKey(session, key, valueBase64, expectedModRevision) as Promise<KvDetail>;
   },
-  deleteKey(key: string): Promise<void> {
+  deleteKey(session: string, key: string, expectedModRevision: number): Promise<void> {
     bindings();
-    return _deleteKey(key);
+    return _deleteKey(session, key, expectedModRevision);
   },
 };

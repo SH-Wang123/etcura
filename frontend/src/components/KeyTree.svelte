@@ -48,10 +48,9 @@
   const ROW_H = 24;
   const OVERSCAN = 10;
 
-  let currentBase = '';
+  let treeGeneration = 0;
   let lastRev = 0;
-  let lastReset = 0;
-  let currentStatus = '';
+
 
   // True while a refresh is in flight (tree levels or the selected value), so
   // the header button can show progress and refuse double clicks.
@@ -120,12 +119,15 @@
   }
 
   async function fetchChildren(prefix: string, cursor: string, append: boolean): Promise<void> {
-    if (loadingSet[prefix]) return;
+    const session = $status.session;
+    const generation = treeGeneration;
+    if (!session || loadingSet[prefix]) return;
     if (!append && childrenOf[prefix] !== undefined && cursor === '') return;
     loadingSet = { ...loadingSet, [prefix]: true as true };
     buildVisible();
     try {
-      const res = await api.listLevel(prefix, cursor, $pageSize);
+      const res = await api.listLevel(session, prefix, cursor, $pageSize);
+      if (generation !== treeGeneration || session !== $status.session) return;
       const prev = append ? childrenOf[prefix] : undefined;
       const baseRows = prev && append ? prev.rows : [];
       childrenOf = {
@@ -137,16 +139,19 @@
         },
       };
     } catch (e) {
+      if (generation !== treeGeneration || session !== $status.session) return;
       const err = localizeError(e);
       if (err.code !== 'CANCELLED') {
         if (!append) childrenOf = { ...childrenOf, [prefix]: { rows: [], cursor: '', hasMore: false } };
         toast(err.message, 'error', err.detail);
       }
     } finally {
-      const next = { ...loadingSet };
-      delete next[prefix];
-      loadingSet = next;
-      buildVisible();
+      if (generation === treeGeneration && session === $status.session) {
+        const next = { ...loadingSet };
+        delete next[prefix];
+        loadingSet = next;
+        buildVisible();
+      }
     }
   }
 
@@ -181,6 +186,7 @@
 
   // Re-read every expanded node + root, keeping expansion and selection.
   async function refreshExpanded(): Promise<void> {
+    ++treeGeneration;
     const targets = [rootPrefix, ...Object.keys(expandedSet)];
     const unique = [...new Set(targets)];
     childrenOf = {};
@@ -189,7 +195,9 @@
     await Promise.all(unique.map((p) => fetchChildren(p, '', false)));
   }
 
-  async function rebuild(base: string): Promise<void> {
+  async function rebuild(base: string, session: string, _reset: number): Promise<void> {
+    ++treeGeneration;
+    lastRev = $treeRev;
     rootPrefix = base;
     childrenOf = {};
     expandedSet = { [base]: true as true };
@@ -197,44 +205,16 @@
     selectedPath = null;
     scrollTop = 0;
     buildVisible();
-    if ($status.state === 'connected') {
+    if (session) {
       await fetchChildren(base, '', false);
     }
   }
 
-  // Base prefix changed -> rebuild from the new root.
-  $: if ($basePath !== currentBase) {
-    currentBase = $basePath;
-    void rebuild($basePath);
-  }
-
-  // treeReset (connect / loadFirst) -> rebuild; treeRev (⌘R, create, delete,
-  // ⟳, page size) -> refresh expanded branches in place.
-  $: if ($treeReset !== lastReset) {
-    lastReset = $treeReset;
-    lastRev = $treeRev;
-    if ($status.state === 'connected') void rebuild($basePath);
-  }
+  $: treeSession = $status.session;
+  $: void rebuild($basePath, treeSession, $treeReset);
   $: if ($treeRev !== lastRev) {
     lastRev = $treeRev;
-    if ($status.state === 'connected' && childrenOf[rootPrefix] !== undefined) void refreshExpanded();
-  }
-
-  // Connection transitions.
-  $: {
-    const s = $status.state;
-    if (s !== currentStatus) {
-      const was = currentStatus;
-      currentStatus = s;
-      if (s === 'connected' && was !== 'connected') {
-        void rebuild($basePath);
-      } else if (s !== 'connected' && was === 'connected') {
-        childrenOf = {};
-        expandedSet = { [rootPrefix]: true as true };
-        selectedPath = null;
-        buildVisible();
-      }
-    }
+    if (treeSession && childrenOf[rootPrefix] !== undefined) void refreshExpanded();
   }
 
   function onScroll(): void {

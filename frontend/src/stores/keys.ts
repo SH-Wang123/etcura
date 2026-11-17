@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { api, localizeError } from '../lib/api';
 import type { KvDetail } from '../lib/types';
+import { status } from './connections';
 import { toast } from '../lib/toast';
 
 export type SearchMode = 'prefix' | 'exact';
@@ -65,12 +66,12 @@ export function selectTreePrefix(p: string): void {
  * listing or filtering on the frontend.
  */
 export async function exactLookup(key: string): Promise<boolean> {
+  const session = get(status).session;
+  if (!key || !session) return false;
   const gen = ++detailGen;
-  const trimmed = key.trim();
-  if (!trimmed) return false;
   detailLoading.set(true);
   try {
-    const d = await api.getKey(trimmed);
+    const d = await api.getKey(session, key);
     if (gen !== detailGen) return false;
     selectedKey.set(d.key);
     detail.set(d);
@@ -90,11 +91,14 @@ export async function exactLookup(key: string): Promise<boolean> {
 
 /** Load a key into the inspector by path (tree leaf selection). */
 export async function selectKeyPath(key: string): Promise<void> {
+  const session = get(status).session;
+  if (!session) return;
+  detail.set(null);
   const gen = ++detailGen;
   selectedKey.set(key);
   detailLoading.set(true);
   try {
-    const d = await api.getKey(key);
+    const d = await api.getKey(session, key);
     if (gen !== detailGen || get(selectedKey) !== key) return;
     detail.set(d);
   } catch (e) {
@@ -110,11 +114,12 @@ export async function selectKeyPath(key: string): Promise<void> {
 /** Reload the selected key (Refresh button in the inspector). */
 export async function reloadDetail(): Promise<void> {
   const key = get(selectedKey);
-  if (!key) return;
+  const session = get(status).session;
+  if (!key || !session) return;
   const gen = ++detailGen;
   detailLoading.set(true);
   try {
-    const d = await api.getKey(key);
+    const d = await api.getKey(session, key);
     if (gen !== detailGen || get(selectedKey) !== key) return;
     detail.set(d);
   } catch (e) {
@@ -129,12 +134,15 @@ export async function reloadDetail(): Promise<void> {
 
 /** Replace the stored detail after a successful save/create. */
 export function updateDetail(d: KvDetail): void {
+  ++detailGen;
+  detailLoading.set(false);
   detail.set(d);
   selectedKey.set(d.key);
 }
 
 export function clearSelection(): void {
   ++detailGen;
+  detailLoading.set(false);
   selectedKey.set(null);
   detail.set(null);
 }
@@ -167,9 +175,8 @@ export async function setPageSize(n: number): Promise<void> {
 
 /** Clear everything (disconnect). */
 export function reset(): void {
-  ++detailGen;
-  selectedKey.set(null);
-  detail.set(null);
+  clearSelection();
+  selectedPrefix.set(get(basePath));
 }
 
 /** After connecting, build the tree for the current base. */

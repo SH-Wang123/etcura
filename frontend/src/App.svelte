@@ -10,7 +10,7 @@
   import ProtoDialog from './components/ProtoDialog.svelte';
   import ScriptDialog from './components/ScriptDialog.svelte';
   import Toast from './components/Toast.svelte';
-  import { loadConnections, refreshStatus, status } from './stores/connections';
+  import { connections, loadConnections, refreshStatus, status } from './stores/connections';
   import { importedProtos, loadProtos } from './stores/protos';
   import { scriptInfo, loadScript } from './stores/script';
   import {
@@ -33,7 +33,7 @@
   let editingHasPassword = false;
 
   // New key dialog state
-  let newKeyOpen = false;
+  let newKeySession = '';
 
   // Proto import dialog state
   let protoDialogOpen = false;
@@ -58,17 +58,19 @@
 
   async function openEditConnection(id: string): Promise<void> {
     dialogForm = await api.getConnection(id);
-    editingHasPassword = true;
+    editingHasPassword = $connections.find((c) => c.id === id)?.hasPassword ?? false;
     connectionDialogOpen = true;
   }
 
   function onConnectionSaved(): void {
     connectionDialogOpen = false;
     void loadConnections();
+    void refreshStatus();
   }
 
   async function onKeyCreated(e: CustomEvent<KvDetail>): Promise<void> {
-    newKeyOpen = false;
+    if (newKeySession !== $status.session) return;
+    newKeySession = '';
     // Refresh the expanded branches in place so the tree keeps its shape; the
     // new key appears if its parent directory is expanded.
     bumpTree();
@@ -76,8 +78,8 @@
   }
 
   function openNewKey(): void {
-    if ($status.state !== 'connected') return;
-    newKeyOpen = true;
+    if (!$status.session || $status.readOnly) return;
+    newKeySession = $status.session;
   }
 
   function onRefreshAll(): void {
@@ -126,6 +128,7 @@
   <footer class="statusbar">
     <span class="dot {$status.state}" />
     <span class="state">{$status.state === 'connected' ? $t('status.connected') : $status.state === 'disconnected' ? $t('status.disconnected') : $status.state === 'connecting' ? $t('status.connecting') : $t('status.error')}</span>
+    {#if $status.readOnly}<span>{$t('conn.readOnly')}</span>{/if}
     {#if $status.endpoints}
       <span class="sep">·</span>
       <span class="endpoints">{$status.endpoints}</span>
@@ -156,8 +159,8 @@
   />
 {/if}
 
-{#if newKeyOpen}
-  <NewKeyDialog defaultPrefix={$selectedPrefix} on:created={onKeyCreated} on:close={() => (newKeyOpen = false)} />
+{#if newKeySession && newKeySession === $status.session}
+  <NewKeyDialog session={newKeySession} defaultPrefix={$selectedPrefix} on:created={onKeyCreated} on:close={() => (newKeySession = '')} />
 {/if}
 
 {#if protoDialogOpen}

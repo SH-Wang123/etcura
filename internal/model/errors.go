@@ -11,6 +11,8 @@ import (
 const (
 	CodeConnectionFailed  = "CONNECTION_FAILED"
 	CodeNotConnected      = "NOT_CONNECTED"
+	CodeConnectionChanged = "CONNECTION_CHANGED"
+	CodeReadOnly          = "READ_ONLY"
 	CodeTimeout           = "TIMEOUT"
 	CodeCancelled         = "CANCELLED"
 	CodeKeyNotFound       = "KEY_NOT_FOUND"

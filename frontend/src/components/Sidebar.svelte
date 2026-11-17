@@ -6,6 +6,8 @@
     connectingId,
     connect,
     disconnect,
+    loadConnections,
+    refreshStatus,
     status,
   } from '../stores/connections';
   import { askConfirm } from '../lib/confirm';
@@ -31,6 +33,7 @@
     if (!ok) return;
     try {
       await api.deleteConnection(c.id);
+      await Promise.all([loadConnections(), refreshStatus()]);
       toast(tr('sidebar.deletedToast', { name: c.name }), 'success');
     } catch (e) {
       const err = localizeError(e);

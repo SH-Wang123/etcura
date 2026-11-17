@@ -11,8 +11,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"errors"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -197,10 +197,10 @@ func TestIntegrationCRUDAndCAS(t *testing.T) {
 	}
 
 	// Delete, then delete again -> KEY_NOT_FOUND.
-	if err := DeleteKey(ctx, client, key); err != nil {
+	if err := DeleteKey(ctx, client, key, d2.ModRevision); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	err = DeleteKey(ctx, client, key)
+	err = DeleteKey(ctx, client, key, d2.ModRevision)
 	if code := appErrCode(err); code != model.CodeKeyNotFound {
 		t.Fatalf("double delete -> %v, want KEY_NOT_FOUND", err)
 	}
@@ -403,4 +403,84 @@ func appErrCode(err error) string {
 		return ae.Code
 	}
 	return "NOT-AN-APP-ERROR:" + err.Error()
+}
+
+func TestIntegrationLeaseAndDeleteConflict(t *testing.T) {
+	client := integrationClient(t)
+	key := testPrefix + "leased"
+	cleanupPrefix(t, client, key)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	lease, err := client.Grant(ctx, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := PutWithCAS(ctx, client, key, []byte("first"), 0, int64(lease.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := PutWithCAS(ctx, client, key, []byte("second"), first.ModRevision, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Lease != int64(lease.ID) || second.Lease != first.Lease || second.ModRevision <= first.ModRevision {
+		t.Fatalf("unexpected saved record: %+v (started with %+v)", second, first)
+	}
+	if err := DeleteKey(ctx, client, key, first.ModRevision); appErrCode(err) != model.CodeRevisionConflict {
+		t.Fatalf("stale delete: %v", err)
+	}
+	got, err := GetKey(ctx, client, key)
+	if err != nil || got.ModRevision != second.ModRevision || got.ValueBase64 != second.ValueBase64 {
+		t.Fatalf("record after stale delete: %+v, %v", got, err)
+	}
+	if err := DeleteKey(ctx, client, key, second.ModRevision); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIntegrationTreeBatchBoundary(t *testing.T) {
+	client := integrationClient(t)
+	prefix := testPrefix + "mixed/"
+	cleanupPrefix(t, client, prefix)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	for start := 0; start < segmentScanBatch-1; start += 100 {
+		batch := make([]clientv3.Op, 0, 100)
+		for i := start; i < min(start+100, segmentScanBatch-1); i++ {
+			batch = append(batch, clientv3.OpPut(fmt.Sprintf("%sa/%04d", prefix, i), ""))
+		}
+		if _, err := client.Txn(ctx).Then(batch...).Commit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, leaf := range []string{"b", "c", "d"} {
+		if _, err := client.Put(ctx, prefix+leaf, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, size := range []int{2, 200} {
+		var names []string
+		var cursor string
+		for i := 0; i < 5; i++ {
+			page, err := ListLevel(ctx, client, prefix, cursor, size)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range page.Rows {
+				names = append(names, row.Name)
+			}
+			if !page.HasMore {
+				break
+			}
+			if page.NextCursor <= cursor {
+				t.Fatalf("cursor did not advance: %q to %q", cursor, page.NextCursor)
+			}
+			cursor = page.NextCursor
+		}
+		if got := strings.Join(names, " "); got != "a/ b c d" {
+			t.Fatalf("page size %d: %q", size, got)
+		}
+	}
 }

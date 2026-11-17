@@ -32,7 +32,7 @@ never loads the whole database.
   same codebase produces native desktop apps everywhere, distributed via
   [Releases](https://github.com/SH-Wang123/etcura/releases)
 - **Connection management**: multiple profiles (name / multiple endpoints / username / TLS /
-  timeouts); Test Connection performs a real `Status` RPC; passwords live in the OS keyring
+  timeouts / read-only); Test Connection performs a real `Status` RPC; passwords live in the OS keyring
   (macOS Keychain / Windows Credential Manager / Linux Secret Service) — the config file never
   stores plaintext secrets
 - **Tree browsing**: single indented tree, lazily expanded directories, click a leaf key to
@@ -56,9 +56,8 @@ never loads the whole database.
   / show stdout), and the bytes always arrive on stdin too. Binary values open in the script
   view automatically, and failures show the exit code plus the interpreter's stderr
 - **Safe writes**: creating checks existence first (overwrite requires confirmation); saving
-  uses `Txn + Compare(ModRevision)` CAS — on conflict you are asked to reload, never
-  silently overwritten; deletes are single-key only and always confirmed (server + full key
-  shown)
+  preserves the lease and uses `Txn + Compare(ModRevision)`. Overwrite and single-key delete
+  check the confirmed revision. Writes are scoped to the active connection session
 - **i18n**: Simplified Chinese / English UI, follows the system language, switchable anytime
   (error messages included)
 - **Shortcuts**: ⌘R refresh · ⌘N new key · ⌘S save · ⌘F search
@@ -201,7 +200,7 @@ lacks it) — plus `etcura-windows-amd64.zip`.
 
 ```bash
 go test ./internal/...                                      # unit tests
-ETCD_ENDPOINTS=127.0.0.1:12379 go test -tags integration ./internal/etcd/ -v   # integration (needs local etcd)
+python3 scripts/test-integration.py "$(command -v etcd)"     # two disposable etcd servers
 npm --prefix frontend run check                             # svelte-check (strict TS)
 npm --prefix frontend run build                             # frontend build
 ```
@@ -220,8 +219,8 @@ npm --prefix frontend run build                             # frontend build
   interleaved with direct leaves); the cursor guarantees no duplicates or gaps across pages,
   with a hard per-page scan budget
 - One long-lived client per connection; switching closes the old client first
-- Every RPC runs under `context.WithTimeout`; starting a new query cancels the previous
-  in-flight one; the UI keeps generation counters against out-of-order responses
+- RPCs use request deadlines. The UI discards stale responses by connection session and
+  request generation
 - Shutdown: cancel outstanding requests → close the client → exit; no goroutine or context leaks
 
 ## Roadmap (Phase 2 candidates)

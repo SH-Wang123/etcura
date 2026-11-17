@@ -32,13 +32,14 @@ type TLSConfig struct {
 // ConnectionConfig is one saved etcd server profile. The password is never
 // part of this struct: it lives in the macOS Keychain (see internal/config).
 type ConnectionConfig struct {
-	ID               string     `json:"id"`
-	Name             string     `json:"name"`
-	Endpoints        []string   `json:"endpoints"`
-	Username         string     `json:"username,omitempty"`
-	DialTimeoutMs    int        `json:"dialTimeoutMs"`
-	RequestTimeoutMs int        `json:"requestTimeoutMs"`
-	TLS              TLSConfig  `json:"tls"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Endpoints        []string  `json:"endpoints"`
+	Username         string    `json:"username,omitempty"`
+	DialTimeoutMs    int       `json:"dialTimeoutMs"`
+	RequestTimeoutMs int       `json:"requestTimeoutMs"`
+	ReadOnly         bool      `json:"readOnly"`
+	TLS              TLSConfig `json:"tls"`
 }
 
 // ConnectionSummary is what the connection list shows. It never contains
@@ -54,6 +55,9 @@ type ConnectionSummary struct {
 // last known cluster facts.
 type StatusInfo struct {
 	State       string `json:"state"`
+	ProfileID   string `json:"profileId"`
+	Session     string `json:"session"`
+	ReadOnly    bool   `json:"readOnly"`
 	Name        string `json:"name"`
 	Endpoints   string `json:"endpoints"`
 	Header      int64  `json:"header"`

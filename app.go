@@ -20,17 +20,9 @@ import (
 // and the config store, and enforces the cancellation policy for UI-driven
 // requests that can be superseded by newer ones.
 type App struct {
-	ctx context.Context
-	mgr *etcd.Manager
-
-	// listMu guards the single cancellation slot for key-list requests: a new
-	// ListKeys cancels the previous one so a slow stale query can never win.
-	listMu     sync.Mutex
-	listCancel context.CancelFunc
-
-	// detailMu guards the same pattern for GetKey (rapid selection changes).
-	detailMu     sync.Mutex
-	detailCancel context.CancelFunc
+	ctx        context.Context
+	mgr        *etcd.Manager
+	profilesMu sync.Mutex
 
 	// protos holds the compiled descriptor set of imported .proto files for
 	// heuristic protobuf value matching.
@@ -56,23 +48,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
-// shutdown runs on app exit: cancel outstanding requests, close the etcd
-// client, then let Wails tear down.
-func (a *App) shutdown(ctx context.Context) {
-	a.listMu.Lock()
-	if a.listCancel != nil {
-		a.listCancel()
-		a.listCancel = nil
-	}
-	a.listMu.Unlock()
-	a.detailMu.Lock()
-	if a.detailCancel != nil {
-		a.detailCancel()
-		a.detailCancel = nil
-	}
-	a.detailMu.Unlock()
-	a.mgr.Close()
-}
+func (a *App) shutdown(_ context.Context) { a.mgr.Disconnect() }
 
 // ---------------------------------------------------------------- connections
 
@@ -99,6 +75,8 @@ func (a *App) ListConnections() []model.ConnectionSummary {
 //   - remember && password == ""  -> keep whatever is stored (editing case)
 //   - !remember                   -> remove stored password
 func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememberPassword bool) (model.ConnectionConfig, error) {
+	a.profilesMu.Lock()
+	defer a.profilesMu.Unlock()
 	if err := cfg.Normalize(); err != nil {
 		return model.ConnectionConfig{}, err
 	}
@@ -109,6 +87,7 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 	}
 
 	isNew := cfg.ID == ""
+	readOnlyChanged := false
 	if isNew {
 		id, err := newID()
 		if err != nil {
@@ -120,6 +99,7 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 		for _, c := range conns {
 			if c.ID == cfg.ID {
 				found = true
+				readOnlyChanged = c.ReadOnly != cfg.ReadOnly
 				break
 			}
 		}
@@ -152,12 +132,17 @@ func (a *App) SaveConnection(cfg model.ConnectionConfig, password string, rememb
 	if err := config.Save(conns); err != nil {
 		return model.ConnectionConfig{}, err
 	}
+	if readOnlyChanged {
+		a.mgr.DisconnectProfile(cfg.ID)
+	}
 	return cfg, nil
 }
 
 // DeleteConnection removes a profile and its Keychain entry. If it is the
 // active connection the client is closed.
 func (a *App) DeleteConnection(id string) error {
+	a.profilesMu.Lock()
+	defer a.profilesMu.Unlock()
 	if id == "" {
 		return model.NewInvalidArgument("connection id must not be empty")
 	}
@@ -180,11 +165,9 @@ func (a *App) DeleteConnection(id string) error {
 	if err := config.Save(kept); err != nil {
 		return err
 	}
+	a.mgr.DisconnectProfile(id)
 	if err := config.DeletePassword(id); err != nil {
 		return model.NewError(model.CodeConfigError, "could not remove stored password").WithDetail(err.Error())
-	}
-	if profile, ok := a.mgr.Profile(); ok && profile.ID == id {
-		_ = a.mgr.Disconnect()
 	}
 	return nil
 }
@@ -255,17 +238,12 @@ func (a *App) Connect(id string) (model.StatusInfo, error) {
 	ctx, cancel := context.WithTimeout(a.ctx, 60*time.Second)
 	defer cancel()
 
-	if _, err := a.mgr.Connect(ctx, cfg, password); err != nil {
-		return a.mgr.Status(), err
-	}
-	return a.mgr.Status(), nil
+	return a.mgr.Connect(ctx, cfg, password)
 }
 
 // Disconnect closes the active connection.
 func (a *App) Disconnect() (model.StatusInfo, error) {
-	if err := a.mgr.Disconnect(); err != nil {
-		return a.mgr.Status(), err
-	}
+	a.mgr.Disconnect()
 	return a.mgr.Status(), nil
 }
 
@@ -274,31 +252,17 @@ func (a *App) GetStatus() model.StatusInfo { return a.mgr.Status() }
 
 // ---------------------------------------------------------------------- keys
 
-// ListKeys fetches one page. Starting a new list request cancels the previous
-// in-flight one (prefix typed faster than the server answered), so stale
-// responses can neither overwrite fresh state nor leak goroutines.
-func (a *App) ListKeys(prefix, cursor string, pageSize int) (model.KeyPage, error) {
-	client, err := a.mgr.Client()
+// ListKeys fetches one page of key metadata for the supplied session.
+func (a *App) ListKeys(session, prefix, cursor string, pageSize int) (model.KeyPage, error) {
+	client, timeout, err := a.mgr.Client(session, false)
 	if err != nil {
 		return model.KeyPage{}, err
 	}
-
-	a.listMu.Lock()
-	if a.listCancel != nil {
-		a.listCancel()
+	page, err := etcd.ListPage(etcd.WithRequestTimeout(a.ctx, timeout), client, prefix, cursor, pageSize)
+	if err == nil {
+		a.mgr.SetRevision(session, page.Revision)
 	}
-	ctx, cancel := context.WithCancel(a.ctx)
-	a.listCancel = cancel
-	a.listMu.Unlock()
-
-	ctx = etcd.WithRequestTimeout(ctx, a.mgr.RequestTimeout())
-	page, err := etcd.ListPage(ctx, client, prefix, cursor, pageSize)
-	cancel() // release this request's resources; the next call re-cancels anyway
-	if err != nil {
-		return model.KeyPage{}, err
-	}
-	a.mgr.SetRevision(page.Revision)
-	return page, nil
+	return page, err
 }
 
 // ListLevel returns one page of a dynamic browser column under prefix:
@@ -306,36 +270,34 @@ func (a *App) ListKeys(prefix, cursor string, pageSize int) (model.KeyPage, erro
 // Tree refreshes issue several of these in parallel, so each request gets its
 // own timeout context instead of a shared cancellation slot (parallel tree
 // requests must not cancel each other).
-func (a *App) ListLevel(prefix, cursor string, pageSize int) (model.LevelPage, error) {
-	client, err := a.mgr.Client()
+func (a *App) ListLevel(session, prefix, cursor string, pageSize int) (model.LevelPage, error) {
+	client, timeout, err := a.mgr.Client(session, false)
 	if err != nil {
 		return model.LevelPage{}, err
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, a.mgr.RequestTimeout())
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
-	return etcd.ListLevel(ctx, client, prefix, cursor, pageSize)
+	return etcd.ListLevel(etcd.WithRequestTimeout(ctx, timeout), client, prefix, cursor, pageSize)
 }
 
-// GetKey loads the full record (value included) for the selected key. Rapid
-// selection changes cancel the previous load.
-func (a *App) GetKey(key string) (model.KvDetail, error) {
-	client, err := a.mgr.Client()
+// GetKey loads the full record for the selected key in the supplied session.
+func (a *App) GetKey(session, key string) (model.KvDetail, error) {
+	client, timeout, err := a.mgr.Client(session, false)
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	ctx, cancel := a.detailContext()
-	defer cancel()
+	ctx := etcd.WithRequestTimeout(a.ctx, timeout)
 	detail, err := etcd.GetKey(ctx, client, key)
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	a.mgr.SetRevision(detail.ModRevision)
+	a.mgr.SetRevision(session, detail.ModRevision)
 	return detail, nil
 }
 
 // CreateKey writes a brand-new key. expectedModRevision=0 in the CAS txn
 // makes it fail with KEY_ALREADY_EXISTS instead of silently overwriting.
-func (a *App) CreateKey(key, valueBase64, leaseID string) (model.KvDetail, error) {
+func (a *App) CreateKey(session, key, valueBase64, leaseID string) (model.KvDetail, error) {
 	value, err := decodeValue(valueBase64)
 	if err != nil {
 		return model.KvDetail{}, err
@@ -344,39 +306,42 @@ func (a *App) CreateKey(key, valueBase64, leaseID string) (model.KvDetail, error
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	client, err := a.mgr.Client()
+	client, timeout, err := a.mgr.Client(session, true)
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, a.mgr.RequestTimeout())
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
-	return etcd.PutWithCAS(ctx, client, key, value, 0, lease)
+	return etcd.PutWithCAS(etcd.WithRequestTimeout(ctx, timeout), client, key, value, 0, lease)
 }
 
 // SaveKey updates an existing key under a ModRevision CAS check.
-func (a *App) SaveKey(key, valueBase64 string, expectedModRevision int64) (model.KvDetail, error) {
+func (a *App) SaveKey(session, key, valueBase64 string, expectedModRevision int64) (model.KvDetail, error) {
+	if expectedModRevision <= 0 {
+		return model.KvDetail{}, model.NewInvalidArgument("a positive revision is required")
+	}
 	value, err := decodeValue(valueBase64)
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	client, err := a.mgr.Client()
+	client, timeout, err := a.mgr.Client(session, true)
 	if err != nil {
 		return model.KvDetail{}, err
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, a.mgr.RequestTimeout())
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
-	return etcd.PutWithCAS(ctx, client, key, value, expectedModRevision, 0)
+	return etcd.PutWithCAS(etcd.WithRequestTimeout(ctx, timeout), client, key, value, expectedModRevision, 0)
 }
 
 // DeleteKey deletes exactly one key after the UI has confirmed it.
-func (a *App) DeleteKey(key string) error {
-	client, err := a.mgr.Client()
+func (a *App) DeleteKey(session, key string, expectedModRevision int64) error {
+	client, timeout, err := a.mgr.Client(session, true)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, a.mgr.RequestTimeout())
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
-	return etcd.DeleteKey(ctx, client, key)
+	return etcd.DeleteKey(etcd.WithRequestTimeout(ctx, timeout), client, key, expectedModRevision)
 }
 
 // ---------------------------------------------------------------- protobuf
@@ -455,17 +420,6 @@ func (a *App) RunScript(valueBase64 string) (model.ScriptOutput, error) {
 }
 
 // ------------------------------------------------------------------ internals
-
-func (a *App) detailContext() (context.Context, context.CancelFunc) {
-	a.detailMu.Lock()
-	defer a.detailMu.Unlock()
-	if a.detailCancel != nil {
-		a.detailCancel()
-	}
-	ctx, cancel := context.WithCancel(a.ctx)
-	a.detailCancel = cancel
-	return etcd.WithRequestTimeout(ctx, a.mgr.RequestTimeout()), cancel
-}
 
 // decodeValue decodes the frontend-provided base64 payload strictly, so a
 // broken encoding surfaces as INVALID_ARGUMENT instead of corrupted bytes.

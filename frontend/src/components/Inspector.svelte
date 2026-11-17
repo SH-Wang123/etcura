@@ -41,6 +41,8 @@
 
   let mode: ViewMode = 'text';
   let text = '';
+  let editMode: 'text' | 'hex' | 'base64' = 'text';
+  let mutating = false;
   let originalBytes: Uint8Array = new Uint8Array(0);
   let badges: string[] = [];
 
@@ -66,7 +68,8 @@
     const initialMode: ViewMode = scriptActive && !$detail.isUTF8 ? 'script' : $detail.isUTF8 ? 'text' : 'hex';
     originalBytes = b64ToBytes($detail.valueBase64);
     mode = initialMode;
-    text = render(originalBytes, initialMode === 'script' ? 'text' : initialMode);
+    editMode = $detail.isUTF8 ? 'text' : 'hex';
+    text = render(originalBytes, editMode);
     protoResult = null;
     protoSelected = 0;
     resetScriptOutput();
@@ -131,13 +134,12 @@
 
   function switchMode(m: ViewMode): void {
     if (m === mode) return;
-    if (mode !== 'proto' && mode !== 'script') {
-      // Leaving an editable mode: carry the buffer over to the new encoding.
-      const current = encodeBytes(mode, text);
+    if (m !== 'proto' && m !== 'script' && m !== editMode) {
+      const current = encodeBytes(editMode, text);
       if (!current) return;
       text = render(current, m);
+      editMode = m;
     }
-    // Leaving 'proto': the edit buffer was never touched, just switch back.
     mode = m;
   }
 
@@ -182,50 +184,62 @@
 
   async function save(): Promise<void> {
     const d = $detail;
-    if (!d || !dirty || invalidInput || $detailLoading) return;
+    const session = $status.session;
+    if (!d || !session || $status.readOnly || mutating || !dirty || invalidInput || $detailLoading) return;
+    mutating = true;
     try {
-      const saved = await api.saveKey(d.key, bytesToB64(currentBytes as Uint8Array), d.modRevision);
+      const saved = await api.saveKey(session, d.key, bytesToB64(currentBytes as Uint8Array), d.modRevision);
+      if (session !== $status.session || $detail !== d) return;
       updateDetail(saved);
       originalBytes = b64ToBytes(saved.valueBase64);
       toast(tr('inspector.savedToast'), 'success');
     } catch (e) {
       const err = localizeError(e);
+      if (session !== $status.session || $detail !== d) return;
       if (err.code === 'REVISION_CONFLICT') {
         const ok = await askConfirm({
           title: tr('inspector.conflictTitle'),
           lines: [err.message, '', tr('inspector.conflictQuestion')],
           confirmLabel: tr('inspector.reload'),
         });
-        if (ok) await reloadDetail();
+        if (ok && session === $status.session && $detail === d) await reloadDetail();
       } else {
         toast(err.message, 'error', err.detail);
       }
+    } finally {
+      mutating = false;
     }
   }
 
   async function remove(): Promise<void> {
     const d = $detail;
-    if (!d) return;
+    const session = $status.session;
+    if (!d || !session || $status.readOnly || $detailLoading || mutating) return;
     const ok = await askConfirm({
       title: tr('inspector.deleteTitle'),
       lines: [
         tr('inspector.deleteServer', { name: $status.name || $status.endpoints }),
         tr('inspector.deleteKeyLine', { key: d.key }),
+        `ModRevision ${d.modRevision}`,
         '',
         tr('inspector.cannotUndo'),
       ],
       confirmLabel: tr('btn.delete'),
       danger: true,
     });
-    if (!ok) return;
+    if (!ok || session !== $status.session || $detail !== d) return;
+    mutating = true;
     try {
-      await api.deleteKey(d.key);
-      clearSelection();
+      await api.deleteKey(session, d.key, d.modRevision);
+      if (session !== $status.session) return;
+      if ($detail === d) clearSelection();
       toast(tr('inspector.deletedToast', { key: d.key }), 'success');
       await refreshCurrent();
     } catch (e) {
       const err = localizeError(e);
       toast(err.message, 'error', err.detail);
+    } finally {
+      mutating = false;
     }
   }
 
@@ -302,13 +316,13 @@
         </button>
       {/if}
       <button class="btn btn-tiny" on:click={() => void reloadDetail()} title={$t('tip.reload')}>{$t('btn.reload')}</button>
-      <button class="btn btn-tiny danger" on:click={() => void remove()} title={$t('tip.delete')}>{$t('btn.delete')}</button>
-      <button class="btn btn-tiny primary" disabled={!dirty || invalidInput} on:click={() => void save()} title={$t('tip.save')}>
+      <button class="btn btn-tiny danger" disabled={$status.readOnly || $detailLoading || mutating} on:click={() => void remove()} title={$t('tip.delete')}>{$t('btn.delete')}</button>
+      <button class="btn btn-tiny primary" disabled={$status.readOnly || $detailLoading || mutating || !dirty || invalidInput} on:click={() => void save()} title={$t('tip.save')}>
         {dirty ? $t('btn.save') : $t('btn.saved')}
       </button>
     </div>
 
-    {#if invalidInput && mode !== 'proto'}
+    {#if invalidInput && mode !== 'proto' && mode !== 'script'}
       <div class="invalid">{mode === 'hex' ? $t('inspector.invalidHex') : $t('inspector.invalidBase64')}</div>
     {/if}
     {#if mode === 'proto'}
@@ -337,6 +351,7 @@
     {:else}
       <textarea
         class="editor mono"
+        readonly={$status.readOnly || mutating}
         bind:value={text}
         wrap={mode === 'text' ? 'soft' : 'off'}
         spellcheck="false"

@@ -7,6 +7,7 @@
   import { utf8Encode, bytesToB64 } from '../lib/base64';
   import type { KvDetail } from '../lib/types';
 
+  export let session: string;
   export let defaultPrefix = '/';
 
   const dispatch = createEventDispatcher<{ created: KvDetail; close: void }>();
@@ -17,27 +18,23 @@
   let creating = false;
 
   async function onCreate(): Promise<void> {
-    const k = key.trim();
+    if (creating) return;
+    const k = key;
+    const b64 = bytesToB64(utf8Encode(value));
     if (!k) {
       toast(tr('newkey.emptyKey'), 'error');
       return;
     }
     creating = true;
     try {
-      const b64 = bytesToB64(utf8Encode(value));
-      const created = await api.createKey(k, b64, leaseID.trim());
+      const created = await api.createKey(session, k, b64, leaseID.trim());
       toast(tr('newkey.createdToast', { key: k }), 'success');
       dispatch('created', created);
       return;
     } catch (e) {
       const err = localizeError(e);
       if (err.code === 'KEY_ALREADY_EXISTS') {
-        const ok = await askConfirm({
-          title: tr('newkey.existsTitle'),
-          lines: [tr('newkey.existsKeyLine', { key: k }), '', tr('newkey.existsQuestion')],
-          confirmLabel: tr('newkey.overwrite'),
-        });
-        if (ok) await overwrite(k);
+        await overwrite(k, b64);
       } else {
         toast(err.message, 'error', err.detail);
       }
@@ -46,13 +43,23 @@
     }
   }
 
-  // Overwrite path: load the current record, then save under a CAS check so a
-  // concurrent writer between the two calls still surfaces a conflict.
-  async function overwrite(k: string): Promise<void> {
+  // Capture and display the revision before asking for confirmation.
+  async function overwrite(key: string, valueBase64: string): Promise<void> {
     try {
-      const existing = await api.getKey(k);
-      const saved = await api.saveKey(k, bytesToB64(utf8Encode(value)), existing.modRevision);
-      toast(tr('newkey.overwroteToast', { key: k }), 'success');
+      const existing = await api.getKey(session, key);
+      const ok = await askConfirm({
+        title: tr('newkey.existsTitle'),
+        lines: [
+          tr('newkey.existsKeyLine', { key }),
+          `ModRevision ${existing.modRevision}`,
+          '',
+          tr('newkey.existsQuestion'),
+        ],
+        confirmLabel: tr('newkey.overwrite'),
+      });
+      if (!ok) return;
+      const saved = await api.saveKey(session, key, valueBase64, existing.modRevision);
+      toast(tr('newkey.overwroteToast', { key }), 'success');
       dispatch('created', saved);
     } catch (e) {
       const err = localizeError(e);

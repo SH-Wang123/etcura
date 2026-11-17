@@ -11,17 +11,22 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   GO_VERSION: "1.25"
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   WAILS_VERSION: v2.15.0
 
 jobs:
+  test:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/ci.yml
+
   build:
     name: Build ${{ matrix.platform }}
     strategy:
@@ -66,7 +71,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libgtk-3-dev libwebkit2gtk-4.1-dev libnss3-dev pkg-config
+            libgtk-3-dev libwebkit2gtk-4.1-dev libnss3-dev pkg-config xvfb xauth
           # Wails v2 still looks for the webkit2gtk-4.0 pkg-config module, which
           # Ubuntu 24.04 dropped (only 4.1 ships now). The 4.1 headers/libs are
           # API-compatible for what Wails uses, so alias the .pc file.
@@ -79,6 +84,31 @@ jobs:
       - name: Build
         shell: bash
         run: wails build -platform "${{ matrix.platform }}"
+
+      - name: Smoke test Linux startup
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          result=0
+          xvfb-run -a timeout 8s ./build/bin/etcura || result=$?
+          test "$result" -eq 124
+
+      - name: Smoke test Windows startup
+        if: matrix.platform == 'windows/amd64'
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath (Resolve-Path 'build/bin/etcura.exe') -PassThru
+          try {
+            for ($i = 0; $i -lt 25; $i++) {
+              Start-Sleep -Seconds 1
+              $app.Refresh()
+              if ($app.HasExited) { throw "Etcura exited with code $($app.ExitCode)" }
+              if ($app.MainWindowHandle -ne 0) { return }
+            }
+            throw "Etcura did not create a window"
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+          }
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
@@ -122,7 +152,9 @@ jobs:
 
   release:
     name: Publish release
-    needs: build
+    needs: [test, build]
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:

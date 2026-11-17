@@ -11,6 +11,9 @@ export const connectingId = writable<string | null>(null);
 
 export const status = writable<StatusInfo>({
   state: 'disconnected',
+  profileId: '',
+  session: '',
+  readOnly: false,
   name: '',
   endpoints: '',
   header: 0,
@@ -26,26 +29,37 @@ export async function loadConnections(): Promise<void> {
   }
 }
 
+let statusRequest = 0;
+let disconnecting = false;
+
+function applyStatus(next: StatusInfo): void {
+  if (next.session !== get(status).session) keysStore.reset();
+  activeId.set(next.profileId || null);
+  status.set(next);
+}
+
 export async function refreshStatus(): Promise<void> {
+  const request = ++statusRequest;
   try {
-    status.set(await api.getStatus());
+    const next = await api.getStatus();
+    if (request === statusRequest) applyStatus(next);
   } catch {
     /* status is best effort */
   }
 }
 
 export async function connect(id: string): Promise<boolean> {
+  if (get(connectingId) || disconnecting) return false;
   connectingId.set(id);
+  ++statusRequest;
+  applyStatus({ ...get(status), state: 'connecting', profileId: '', session: '', readOnly: false });
   try {
-    const st = await api.connect(id);
-    status.set(st);
-    if (st.state === 'connected') {
-      activeId.set(id);
-      toast(tr('connections.connectedToast', { name: st.name }), 'success');
-      await keysStore.reloadAfterConnect();
-      return true;
-    }
-    return false;
+    const next = await api.connect(id);
+    ++statusRequest;
+    applyStatus(next);
+    if (next.state !== 'connected') return false;
+    toast(tr('connections.connectedToast', { name: next.name }), 'success');
+    return true;
   } catch (e) {
     const err = localizeError(e);
     toast(err.message, 'error', err.detail);
@@ -57,12 +71,17 @@ export async function connect(id: string): Promise<boolean> {
 }
 
 export async function disconnect(): Promise<void> {
+  if (get(connectingId) || disconnecting) return;
+  disconnecting = true;
+  ++statusRequest;
   try {
-    status.set(await api.disconnect());
-    activeId.set(null);
-    keysStore.reset();
+    const next = await api.disconnect();
+    ++statusRequest;
+    applyStatus(next);
   } catch (e) {
     toast(localizeError(e).message, 'error');
+  } finally {
+    disconnecting = false;
   }
 }
 

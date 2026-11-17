@@ -49,6 +49,7 @@
     if (e.key !== 'Enter') return;
     if (baseTimer) clearTimeout(baseTimer);
     if ($searchMode === 'exact') void exactLookup(search);
+    else void setBasePath(search);
   }
 
   function onRefresh(): void {
@@ -110,7 +111,7 @@
     >
       {$t('btn.script')}{scriptName !== '' ? ` · ${scriptName}` : ''}
     </button>
-    <button class="btn" on:click={onNewKey} disabled={$status.state !== 'connected'} title={$t('tip.newKey')}>
+    <button class="btn" on:click={onNewKey} disabled={$status.state !== 'connected' || $status.readOnly} title={$t('tip.newKey')}>
       {$t('btn.newKey')}
     </button>
     <button class="btn" on:click={onRefresh} title={$t('tip.refresh')}>{$t('btn.refresh')}</button>

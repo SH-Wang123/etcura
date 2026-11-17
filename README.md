@@ -14,9 +14,7 @@ Go · Wails v2 · Svelte · TypeScript · 一套代码，各平台原生桌面�
 
 **Etcura**（**et**cd + **cura**te，精心打理）是一个"稳定、轻量、启动快、可长期日常使用"的跨平台 etcd 图形客户端
 （macOS / Windows / Linux）：连接管理、目录树浏览、查看/新建/编辑（CAS 防覆盖）/删除 key、
-Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails 绑定调用；专为大规模集群设计，
-**最高可流畅支撑百万级 key** —— 全程游标分页 + 服务端过滤，内存占用不随 key 总量增长，
-绝不一次性加载数据库。
+Protobuf 值自动解码。Go 承担全部 etcd 通信，前端通过 Wails 绑定调用。目录按需展开，通过游标分页加载。
 
 <div align="center">
   <img src="docs/screenshot.png" alt="Etcura 界面截图" width="960" />
@@ -27,7 +25,7 @@ Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails �
 
 - **跨平台**：基于 Wails v2（Go + 各平台系统 WebView），同一代码库构建各平台原生桌面应用，
   安装包统一通过 [Releases](https://github.com/SH-Wang123/etcura/releases) 分发
-- **连接管理**：多配置（名称 / 多 Endpoints / 用户名 / TLS / 超时），测试连接走真实
+- **连接管理**：多配置（名称 / 多 Endpoints / 用户名 / TLS / 超时 / 只读），测试连接走真实
   `Status` RPC；密码存系统钥匙串（macOS Keychain / Windows 凭据管理器 / Linux Secret
   Service），配置文件永不落盘明文
 - **目录树浏览**：单列缩进目录树，目录懒展开、叶子 key 点击即查看；服务端游标分页
@@ -46,7 +44,7 @@ Protobuf 值自动解码。Go 承担全部 etcd 通信，前端只通过 Wails �
   （不注入入参 / 直接显示 stdout），也支持从 stdin 读取。二进制 value 会自动以脚本视图
   打开，失败时显示退出码与解释器 stderr
 - **安全写入**：新建前检查存在性（已存在需确认覆盖）；保存走 `Txn + Compare(ModRevision)`
-  CAS，冲突时提示重载，绝不静默覆盖；删除仅限单 key 且强制确认（显示服务器与完整 key）
+  CAS 并保留 Lease；覆盖和单 key 删除按确认时的 revision 校验，冲突时提示重载。写入绑定当前连接会话
 - **国际化**：简体中文 / English 界面，跟随系统语言，可随时切换（含错误消息本地化）
 - **快捷键**：⌘R 刷新 · ⌘N 新建 · ⌘S 保存 · ⌘F 搜索
 - **深色模式**：跟随系统外观
@@ -149,7 +147,7 @@ go run ./scripts/seed -endpoints 127.0.0.1:12379 -count 100000
 go run ./scripts/bench -endpoints 127.0.0.1:12379 -pages 100 -page-size 200 -rounds 3
 ```
 
-基准走与应用完全相同的分页代码路径。参考结果（Apple Silicon，本地 etcd，
+该基准测量平铺分页的 Go 堆内存。参考结果（Apple Silicon，本地 etcd，
 10 万 key，连续 3 轮 × 100 页 × 200 行）：每轮 ~0.3s，Go 堆稳定在 ~1.1 MB，
 不随浏览量增长。
 
@@ -183,7 +181,7 @@ brew install mingw-w64          # 交叉编译工具链（仅 macOS/Linux 需要
 
 ```bash
 go test ./internal/...                                      # 单元测试
-ETCD_ENDPOINTS=127.0.0.1:12379 go test -tags integration ./internal/etcd/ -v   # 集成测试（需本地 etcd）
+python3 scripts/test-integration.py "$(command -v etcd)"     # 两个临时 etcd 实例
 npm --prefix frontend run check                             # svelte-check（strict TS）
 npm --prefix frontend run build                             # 前端构建
 ```
@@ -201,8 +199,7 @@ npm --prefix frontend run build                             # 前端构建
 - 树的每一层由 `ListLevel` 在服务端扫描去重（目录段 + 直连叶子混排），
   游标保证跨页不重不漏，每页扫描有硬预算
 - 每个连接一个长期存活的 client；切换时先关旧再建新
-- 所有 RPC 带 `context.WithTimeout`；新查询自动取消上一个 in-flight 请求；
-  UI 侧另有代际号防乱序
+- RPC 使用请求超时。前端按连接会话和请求顺序丢弃过期响应
 - 退出时取消在途请求 → 关闭 client → 退出，无 goroutine/context 泄漏
 
 ## 路线图（Phase 2 候选）
